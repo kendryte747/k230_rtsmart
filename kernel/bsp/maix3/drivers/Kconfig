@@ -107,19 +107,44 @@ menu "Drivers Configuration"
         if RT_USING_I2C
             config RT_USING_I2C0
                 bool "Enable I2C0"
-                default n
+                default y
+                if RT_USING_I2C0
+                    config RT_USING_I2C0_SLAVE
+                    bool "Enable I2C0 SLAVE mode"
+                    default n
+                endif
             config RT_USING_I2C1
                 bool "Enable I2C1"
-                default n
+                default y
+                if RT_USING_I2C1
+                    config RT_USING_I2C1_SLAVE
+                    bool "Enable I2C1 SLAVE mode"
+                    default n
+                endif
             config RT_USING_I2C2
                 bool "Enable I2C2"
-                default n
+                default y
+                if RT_USING_I2C2
+                    config RT_USING_I2C2_SLAVE
+                    bool "Enable I2C2 SLAVE mode"
+                    default n
+                endif
             config RT_USING_I2C3
                 bool "Enable I2C3"
-                default n
+                default y
+                if RT_USING_I2C3
+                    config RT_USING_I2C3_SLAVE
+                    bool "Enable I2C3 SLAVE mode"
+                    default n
+                endif
             config RT_USING_I2C4
                 bool "Enable I2C4"
-                default n
+                default y
+                if RT_USING_I2C4
+                    config RT_USING_I2C4_SLAVE
+                    bool "Enable I2C4 SLAVE mode"
+                    default n
+                endif
         endif
 
     if RT_USING_TOUCH
