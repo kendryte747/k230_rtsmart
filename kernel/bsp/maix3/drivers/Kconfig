@@ -60,6 +60,7 @@ menu "Drivers Configuration"
 
         menuconfig RT_USING_I2C
                 bool "Enable I2C"
+                default n
 
                 if RT_USING_I2C
                     config RT_USING_I2C0
@@ -292,4 +293,5 @@ menu "Drivers Configuration"
                 endif
             endif
     endmenu
+
 endmenu
