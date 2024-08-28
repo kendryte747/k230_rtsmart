@@ -120,6 +120,7 @@
 #define DEFAULT_BAUDRATE      (115200)
 #define UART1_IRQ              0x11
 #define UART2_IRQ              0x12
+#define UART3_IRQ              0x13
 #define UART4_IRQ              0x14
 
 struct kd_uart_device {
@@ -558,7 +559,7 @@ int kd_hw_uart_init(void)
     struct kd_uart_device *kd_uart_device;
     int i;
 
-#ifdef RT_USING_UART1
+#ifdef RT_USING_UART_CANAAN_1
     kd_uart_device = rt_malloc(sizeof(struct kd_uart_device));
     kd_uart_device->base = rt_ioremap((void *)UART1_BASE_ADDR, UART1_IO_SIZE);
     kd_uart_device->kd_uart.ops = &uart_ops;
@@ -590,7 +591,7 @@ int kd_hw_uart_init(void)
 #endif
 #endif
 
-#ifdef RT_USING_UART2
+#ifdef RT_USING_UART_CANAAN_2
     kd_uart_device = rt_malloc(sizeof(struct kd_uart_device));
     kd_uart_device->base = rt_ioremap((void *)UART2_BASE_ADDR, UART2_IO_SIZE);
     kd_uart_device->kd_uart.ops = &uart_ops;
@@ -622,7 +623,39 @@ int kd_hw_uart_init(void)
 #endif
 #endif
 
-#ifdef RT_USING_UART4
+#ifdef RT_USING_UART_CANAAN_3
+    kd_uart_device = rt_malloc(sizeof(struct kd_uart_device));
+    kd_uart_device->base = rt_ioremap((void *)UART3_BASE_ADDR, UART3_IO_SIZE);
+    kd_uart_device->kd_uart.ops = &uart_ops;
+    kd_uart_device->kd_uart.user_data = (void *)kd_uart_device;
+    kd_uart_device->id = 3;
+    ret = rt_device_register(&kd_uart_device->kd_uart, "uart3", RT_DEVICE_FLAG_RDWR);
+    kd_uart_device->kd_uart.fops = &_uart_fops;
+
+    kd_uart_init(kd_uart_device->base, kd_uart_device->id);
+
+    /* create rx_fifo */
+    kd_uart_device->kd_rx_fifo = rt_malloc(sizeof(struct rt_serial_rx_fifo) + UART_BUFFER_SIZE);
+    kd_uart_device->kd_rx_fifo->buffer = (uint8_t*) (kd_uart_device->kd_rx_fifo + 1);
+    rt_memset(kd_uart_device->kd_rx_fifo->buffer, 0, UART_BUFFER_SIZE);
+    kd_uart_device->kd_rx_fifo->put_index = 0;
+    kd_uart_device->kd_rx_fifo->get_index = 0;
+    kd_uart_device->kd_rx_fifo->is_full = RT_FALSE;
+
+    /* register interrupt handler */
+    rt_hw_interrupt_install(UART3_IRQ, rt_hw_uart_isr, kd_uart_device, "uart3");
+    rt_hw_interrupt_umask(UART3_IRQ);
+
+    /* create timer */
+    rt_timer_init(&kd_uart_device->timer, "uart3_timer", uart_timeout, (void*)kd_uart_device, UART_TIMEOUT, RT_TIMER_FLAG_PERIODIC);
+
+    rt_wqueue_init(&kd_uart_device->kd_uart.wait_queue);
+#ifndef RT_FASTBOOT
+    rt_kprintf("k230 uart3 register OK.\n");
+#endif
+#endif
+
+#ifdef RT_USING_UART_CANAAN_4
     kd_uart_device = rt_malloc(sizeof(struct kd_uart_device));
     kd_uart_device->base = rt_ioremap((void *)UART4_BASE_ADDR, UART4_IO_SIZE);
     kd_uart_device->kd_uart.ops = &uart_ops;

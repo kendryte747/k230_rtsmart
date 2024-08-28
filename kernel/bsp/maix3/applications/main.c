@@ -54,20 +54,21 @@ static bool s_fs_mount_data_succ = false;
 
 static void mnt_mount_table(void)
 {
+    int ret;
     int index = 0;
 
     while (1)
     {
         if (custom_mount_table[index].path == NULL) break;
 
-        if (0x00 != dfs_mount(custom_mount_table[index].device_name,
+        if (0x00 != (ret = dfs_mount(custom_mount_table[index].device_name,
                       custom_mount_table[index].path,
                       custom_mount_table[index].filesystemtype,
                       custom_mount_table[index].rwflag,
-                      custom_mount_table[index].data))
+                      custom_mount_table[index].data)))
         {
-            rt_kprintf("mount fs[%s] on %s failed, error %d.\n", custom_mount_table[index].filesystemtype,
-                       custom_mount_table[index].path, errno);
+            rt_kprintf("mount fs[%s] on %s failed(%d), error %d.\n", custom_mount_table[index].filesystemtype,
+                       custom_mount_table[index].path, ret, errno);
 
           if(0x00 == strcmp("/data", custom_mount_table[index].path)) {
               s_fs_mount_data_succ = false;

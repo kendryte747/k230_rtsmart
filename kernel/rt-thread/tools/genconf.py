@@ -21,6 +21,10 @@ def genconfig() :
     try:
         f = open('.config', 'w')
         for (opt, value) in options.items():
+            # remove header
+            if opt == "RT_CONFIG_H__":
+                continue
+
             if type(value) == type(1):
                 f.write("CONFIG_%s=%d\n" % (opt, value))
 

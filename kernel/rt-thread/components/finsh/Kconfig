@@ -77,7 +77,7 @@ if RT_USING_MSH
         default 10
 
     config MSH_WAIT_LWP_FINISH
-        int "msh creates a user state process and then waits for it to die due to blocking"
+        bool "msh creates a user state process and then waits for it to die due to blocking"
         default n
 
 endif

@@ -315,12 +315,7 @@ static int mpp_device_init(void)
     vdss_init();
     dpu_init();
     dewarp_init();
-
-    // define in mpp/Kconfig
-#if defined(CONFIG_MPP_ENABLE_PM)
     pm_core_init();
-#endif
-
     fft_device_init();
     nonai_2d_init();
     return 0;
