@@ -62,6 +62,10 @@ if GetDepend(['ENABLE_CHERRY_USB_HOST']):
         path += [cwd + '/class/hid/']
         src += Glob('class/hid/usbh_hid.c')
 
+    if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_MSC']):
+        path += [cwd + '/class/msc/']
+        src += Glob('class/msc/usbh_msc.c')
+
     if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_NET_RTL8152']):
         src += Glob('class/vendor/net/usbh_rtl8152.c')
 

@@ -82,6 +82,10 @@ menu "Components Configuration"
                         bool "Enable HID"
                         default n
 
+                    config CHERRY_USB_HOST_ENABLE_CLASS_MSC
+                        bool "Enable MSC"
+                        default n
+
                     config CHERRY_USB_HOST_ENABLE_CLASS_NET_RTL8152
                         bool "Enable net RTL8152"
                         default y

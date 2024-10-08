@@ -23,6 +23,9 @@ if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_CDC_ACM']):
 if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_CDC_ECM']):
     src += Glob('usbh_net_ecm.c')
 
+if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_HID']):
+    src += Glob('usbh_hid_thr.c')
+
 group = DefineGroup('CanmVUSB', src, depend = [], CPPPATH = CPPPATH)
 
 objs = [group]

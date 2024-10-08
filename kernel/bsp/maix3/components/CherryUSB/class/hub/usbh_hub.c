@@ -307,7 +307,8 @@ static void hub_int_complete_callback(void *arg, int nbytes)
         /* Restart timer to submit urb again */
         USB_LOG_DBG("Restart timer\r\n");
         usb_osal_timer_start(hub->int_timer);
-    } else {
+    } else if (nbytes == -USB_ERR_DT) {
+        usbh_submit_urb(&hub->intin_urb);
     }
 }
 
