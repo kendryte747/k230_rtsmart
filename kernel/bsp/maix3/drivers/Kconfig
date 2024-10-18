@@ -30,7 +30,7 @@ menu "Drivers Configuration"
             default n
 
         config RT_USING_HARDLOCK
-            bool "Enabel HardLock driver"
+            bool "Enable HardLock driver"
             default n
                 
         menuconfig RT_USING_HWTIMER
@@ -63,6 +63,10 @@ menu "Drivers Configuration"
             default n
 
             if RT_USING_I2C
+                config RT_USING_SOFT_I2C
+                    bool "Enable Soft I2C"
+                    default n
+
                 config RT_USING_I2C0
                     bool "Enable I2C0"
                     default n
@@ -284,21 +288,105 @@ menu "Drivers Configuration"
                     default n
             endif
 
-        if RT_USING_TOUCH
-            menuconfig RT_USING_TOUCH_FT5316
-                bool "Enable Touch FT5316"
-                default n
+        menuconfig RT_USING_TOUCH
+            bool "Enable Touch Drive"
 
-                if RT_USING_TOUCH_FT5316
-                    config TOUCH_FT5316_I2C_DEV
-                        string "I2C Device name"
-                        default "i2c3"
+            if RT_USING_TOUCH
+                choice TOUCH_DRV_MODEL
+                    bool "Touch Drive Model"
+                    default TOUCH_DRV_MODEL_INT_WITH_THREAD
 
-                    config TOUCH_FT5316_I2C_ADDR
-                        hex
-                        default 0x38
+                    config TOUCH_DRV_MODEL_POOL
+                        bool "Pooling when user read"
+                    config TOUCH_DRV_MODEL_INT_WITH_THREAD
+                        bool "Device Int and Read in Thread"
+                endchoice
+
+                if TOUCH_DRV_MODEL_INT_WITH_THREAD
+                    config TOUCH_DRV_THREAD_PRIO
+                        int "Touch Thread Priority"
+                        default 19
+                    config TOUCH_DRV_THREAD_STACK_SIZE
+                        int "Touch Thread Stack Size"
+                        default 4096
                 endif
-        endif
+
+                config TOUCH_DEV_INT_PIN
+                    int "Touch Device INT Pin"
+                    default -1
+
+                choice TOUCH_DEV_INT_EDGE
+                    bool "Touch Device INT Edge"
+                    default TOUCH_DEV_INT_EDGE_FALLING
+
+                    config TOUCH_DEV_INT_EDGE_RISING
+                        bool "RISING"
+                    config TOUCH_DEV_INT_EDGE_FALLING
+                        bool "FALLING"
+                    config TOUCH_DEV_INT_EDGE_BOTH
+                        bool "BOTH"
+                    config TOUCH_DEV_INT_EDGE_HIGH
+                        bool "HIGH"
+                    config TOUCH_DEV_INT_EDGE_LOW
+                        bool "LOW"
+                endchoice
+
+                config TOUCH_DEV_INT_EDGE
+                    int
+                    default GPIO_PE_RISING if TOUCH_DEV_INT_EDGE_RISING
+                    default GPIO_PE_FALLING if TOUCH_DEV_INT_EDGE_FALLING
+                    default GPIO_PE_BOTH if TOUCH_DEV_INT_EDGE_BOTH
+                    default GPIO_PE_HIGH if TOUCH_DEV_INT_EDGE_HIGH
+                    default GPIO_PE_LOW if TOUCH_DEV_INT_EDGE_LOW
+
+                config TOUCH_DEV_RST_PIN
+                    int "Touch Device RST Pin"
+                    default -1
+
+                config TOUCH_DEV_RST_PIN_VALID_VALUE
+                    int "Touch Device RST Pin Valid Value"
+                    default 0
+
+                config TOUCH_DEV_I2C_BUS
+                    string "Touch Device I2C Bus Name"
+                    default "i2c3"
+                
+                menuconfig TOUCH_DEV_I2C_SET_SPEED
+                    bool "Touch Device Change I2C Speed"
+                    default y
+
+                    if TOUCH_DEV_I2C_SET_SPEED
+                        config TOUCH_DEV_I2C_BUS_SPEED
+                            int "Touch Device I2C Bus Speed"
+                            default 400000
+                    endif
+
+                config TOUCH_DEV_I2C_ADDR
+                    hex "Touch Device I2C Slave Address"
+                    default 0x38
+
+                config TOUCH_RANGE_X
+                    int "Touch Range X, Origin of Touch Output"
+                    default 480
+
+                config TOUCH_RANGE_Y
+                    int "Touch Range Y, Origin of Touch Output"
+                    default 800
+
+                config TOUCH_POINT_NUM
+                    int "Touch Point Number"
+                    default 5
+
+                choice TOUCH_TYPE
+                    bool "Touch Device Type"
+                    default TOUCH_TYPE_FT5316
+
+                    config TOUCH_TYPE_FT5316
+                        bool "FT5316"
+                    config TOUCH_TYPE_CST128
+                        bool "CST128 - FT5316 Compatible"
+                endchoice
+            endif
 
         menuconfig RT_USING_WS2812
             bool "Enable WS2812"

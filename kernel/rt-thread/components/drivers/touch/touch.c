@@ -178,7 +178,7 @@ static rt_err_t rt_touch_control(rt_device_t dev, int cmd, void *args)
         if (result == RT_EOK)
         {
             touch->info.range_y = *(rt_uint32_t *)args;
-            LOG_D("set y coordinate range :%d \n", touch->info.range_x);
+            LOG_D("set y coordinate range :%d \n", touch->info.range_y);
         }
 
         break;

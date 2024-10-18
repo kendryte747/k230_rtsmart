@@ -6,26 +6,19 @@
  * 2022-04-01     SummerGift   add i2c driver
  */
 
-#include <fcntl.h>
 #include <rtthread.h>
 #include <rthw.h>
 #include <rtdevice.h>
 #include <riscv_io.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include "dfs_poll.h"
-#include "finsh.h"
 #include "mmu.h"
 #include "ioremap.h"
 #include "drv_i2c.h"
 #include <dfs_file.h>
 #include <dfs_posix.h>
-#include <sys/ioctl.h>
-#include <time.h>
+#include "sysctl_clk.h"
 
-#include "rtdef.h"
 #include "tick.h"
 
 #define DRV_DEBUG
@@ -60,29 +53,18 @@ enum i2c_slave_event {
 	I2C_SLAVE_STOP,
 };
 
-struct i2c_slave_eeprom {
-    struct rt_device device;
-    volatile int poll_event;
-    rt_uint8_t* buffer;
-    rt_uint8_t ptr;
-    rt_bool_t flag_recv_ptr;
-    rt_uint32_t buffer_size;
-};
-
 typedef void(*i2c_slave_cb)(void* ctx, enum i2c_slave_event event, rt_uint8_t* val);
 
 struct chip_i2c_bus
 {
-    union 
-    {
-        struct rt_i2c_bus_device parent;
-        struct i2c_slave_eeprom slave_device;
-    };
+    struct rt_i2c_bus_device parent;
     struct dw_i2c i2c;
+    uint32_t clock;
 
     rt_bool_t slave;
     rt_uint8_t slave_address;
     i2c_slave_cb slave_callback;
+    void* slave_callback_ctx;
     rt_uint32_t slave_status;
 
     struct rt_i2c_msg *msg;
@@ -114,53 +96,31 @@ static void i2c_delay_us(uint64_t us)
     }
 }
 
-static void dw_i2c_enable(struct i2c_regs *i2c_base, rt_bool_t enable)
-{
-    rt_uint32_t ena = enable ? IC_ENABLE_0B : 0;
-    int timeout = 100;
+#ifdef RT_USING_I2C_SLAVE_EEPROM
+// simulate block device
+struct i2c_slave_eeprom {
+    struct rt_device device;
+    volatile int poll_event;
+    rt_uint8_t* buffer;
+    rt_uint8_t ptr;
+    rt_bool_t flag_recv_ptr;
+};
 
-    do
-    {
-        writel(ena, &i2c_base->ic_enable);
-        if ((readl(&i2c_base->ic_enable_status) & IC_ENABLE_0B) == ena)
-            return;
+static rt_uint8_t eeprom_buffer[256];
+static struct i2c_slave_eeprom eeprom = {
+    .buffer = eeprom_buffer,
+};
 
-        /*
-         * Wait 10 times the signaling period of the highest I2C
-         * transfer supported by the driver (for 400KHz this is
-         * 25us) as described in the DesignWare I2C databook.
-         */
-        // udelay(25);
-    } while (timeout--);
-
-    LOG_D("timeout in %sabling I2C adapter\n", enable ? "en" : "dis");
-}
-
-static int eeprom_open(struct dfs_fd *file) 
-{
-    struct i2c_slave_eeprom *eeprom = file->fnode->data;
-    file->fnode->size = eeprom->buffer_size;
+static int eeprom_open(struct dfs_fd *file) {
+    file->fnode->size = sizeof(eeprom_buffer);
     return 0;
 }
 
-static int eeprom_close(struct dfs_fd *file) 
-{
-    struct i2c_slave_eeprom *eeprom = file->fnode->data;
-
-    if (eeprom->buffer)
-    {
-        rt_free(eeprom->buffer);
-        eeprom->buffer = NULL;
-        eeprom->buffer_size = 0;
-    }
+static int eeprom_close(struct dfs_fd *file) {
     return 0;
 }
 
 static int eeprom_read(struct dfs_fd *file, void *buffer, size_t size) {
-    struct i2c_slave_eeprom *eeprom = file->fnode->data;
-
-    file->fnode->size = eeprom->buffer_size;
-
     if (file->pos >= file->fnode->size) {
         return 0;
     }
@@ -168,16 +128,12 @@ static int eeprom_read(struct dfs_fd *file, void *buffer, size_t size) {
     if (size > lack) {
         size = lack;
     }
-    memcpy(buffer, eeprom->buffer + file->pos, size);
+    memcpy(buffer, eeprom_buffer + file->pos, size);
     file->pos += size;
     return size;
 }
 
 static int eeprom_write(struct dfs_fd *file, const void *buffer, size_t size) {
-    struct i2c_slave_eeprom *eeprom = file->fnode->data;
-
-    file->fnode->size = eeprom->buffer_size;
-
     if (file->pos >= file->fnode->size) {
         return 0;
     }
@@ -185,18 +141,13 @@ static int eeprom_write(struct dfs_fd *file, const void *buffer, size_t size) {
     if (size > lack) {
         size = lack;
     }
-    memcpy(eeprom->buffer + file->pos, buffer, size);
+    memcpy(eeprom_buffer + file->pos, buffer, size);
     file->pos += size;
     return size;
 }
 
-static int eeprom_lseek(struct dfs_fd *file, off_t offset) 
-{
-    struct i2c_slave_eeprom *eeprom = file->fnode->data;
-    file->fnode->size = eeprom->buffer_size;
-
+static int eeprom_lseek(struct dfs_fd *file, off_t offset) {
     if (offset < file->fnode->size) {
-        file->pos = offset;
         return offset;
     } else {
         return -1;
@@ -204,56 +155,11 @@ static int eeprom_lseek(struct dfs_fd *file, off_t offset)
 }
 
 static int eeprom_poll(struct dfs_fd *file, struct rt_pollreq *req) {
-    struct i2c_slave_eeprom *eeprom = file->fnode->data;
-
     rt_device_t device = file->fnode->data;
     rt_poll_add(&device->wait_queue, req);
-    int mask = eeprom->poll_event;
-    eeprom->poll_event = 0;
+    int mask = eeprom.poll_event;
+    eeprom.poll_event = 0;
     return mask;
-}
-
-static int eeprom_ioctl(struct dfs_fd *file, int cmd, void *args)
-{
-    struct i2c_slave_eeprom *eeprom = file->fnode->data;
-    struct chip_i2c_bus* bus = (struct chip_i2c_bus*)eeprom;
-    switch (cmd)
-    {
-    case I2C_SLAVE_IOCTL_SET_BUFFER_SIZE:
-        if (args == NULL)
-        {
-            rt_kprintf("[%s] cmd:%d args is null\n", __func__, cmd);
-            return -1;
-        }
-        size_t size = *((uint32_t *)args);
-        if (eeprom->buffer != NULL)
-        {
-            rt_free(eeprom->buffer);
-            eeprom->buffer_size = 0;
-            eeprom->buffer = NULL;
-        }  
-        if (size > 0)
-        {
-            eeprom->buffer = rt_malloc(size);
-            eeprom->buffer_size = size;
-        }
-        break;
-    case I2C_SLAVE_IOCTL_SET_ADDR:
-        if (args == NULL)
-        {
-            rt_kprintf("[%s] cmd:%d args is null\n", __func__, cmd);
-            return -1;
-        }
-        struct i2c_regs *i2c_base = bus->i2c.regs;
-        dw_i2c_enable(i2c_base, 0);
-        bus->slave_address = *((uint8_t *)args);
-        writel(bus->slave_address, &i2c_base->ic_sar);
-        dw_i2c_enable(i2c_base, 1);
-        break;
-    default:
-        break;
-    }
-    
 }
 
 static const struct dfs_file_ops eeprom_fops = {
@@ -263,40 +169,34 @@ static const struct dfs_file_ops eeprom_fops = {
     .write = eeprom_write,
     .poll = eeprom_poll,
     .lseek = eeprom_lseek,
-    .ioctl = eeprom_ioctl,
 };
 
-int i2c_slave_eeprom_register(struct i2c_slave_eeprom *dev,const char *name) 
-{
+int i2c_slave_eeprom_init(void) {
     int ret = 0;
     // or you can use rt_malloc to allocate
-    ret = rt_device_register(&dev->device, name, RT_DEVICE_FLAG_RDWR);
+    rt_device_t device = (rt_device_t)&eeprom;
+    ret = rt_device_register(device, "slave-eeprom", RT_DEVICE_FLAG_RDWR);
     if (ret) {
         rt_kprintf("%s: rt_device_register error %d\n", __func__, ret);
         return -1;
     }
-    rt_wqueue_init(&dev->device.wait_queue);
-    dev->device.fops = &eeprom_fops;
-    dev->device.user_data = dev;
+    rt_wqueue_init(&device->wait_queue);
+    device->fops = &eeprom_fops;
+    device->user_data = device;
     return 0;
 }
+INIT_BOARD_EXPORT(i2c_slave_eeprom_init);
 
 static void i2c_slave_eeprom_callback(void* ctx, enum i2c_slave_event event, rt_uint8_t* val) {
     struct i2c_slave_eeprom* eeprom = ctx;
 
     switch (event) {
 	case I2C_SLAVE_WRITE_RECEIVED:
-        if (eeprom->flag_recv_ptr) 
-        {
+        if (eeprom->flag_recv_ptr) {
             // write data
-            if (eeprom->buffer != NULL) 
-            {
-                eeprom->buffer[eeprom->ptr] = *val;
-                eeprom->ptr = (eeprom->ptr+1) > eeprom->buffer_size ? 0 : eeprom->ptr+1;
-                eeprom->poll_event |= POLLIN;
-                rt_wqueue_wakeup(&eeprom->device.wait_queue, (void*)POLLIN);
-            }
-            
+            eeprom->buffer[eeprom->ptr++] = *val;
+            eeprom->poll_event |= POLLIN;
+            rt_wqueue_wakeup(&eeprom->device.wait_queue, (void*)POLLIN);
         } else {
             // recv addr byte
             eeprom->flag_recv_ptr = RT_TRUE;
@@ -306,12 +206,9 @@ static void i2c_slave_eeprom_callback(void* ctx, enum i2c_slave_event event, rt_
 
 	case I2C_SLAVE_READ_PROCESSED:
 		/* The previous byte made it to the bus, get next one */
-		eeprom->ptr = (eeprom->ptr+1) > eeprom->buffer_size ? 0 : eeprom->ptr+1;
+		eeprom->ptr++;
 	case I2C_SLAVE_READ_REQUESTED:
-        if (eeprom->buffer != NULL)
-        {
-            *val = eeprom->buffer[eeprom->ptr];
-        }
+		*val = eeprom->buffer[eeprom->ptr];
 		/*
 		 * Do not increment buffer_idx here, because we don't know if
 		 * this byte will be actually used. Read Linux I2C slave docs
@@ -329,6 +226,7 @@ static void i2c_slave_eeprom_callback(void* ctx, enum i2c_slave_event event, rt_
 		break;
 	}
 }
+#endif
 
 void xxd(int argc, char* argv[]) {
     if (argc != 2) {
@@ -358,17 +256,20 @@ static struct chip_i2c_bus i2c_buses[] =
 {
 #ifdef RT_USING_I2C0
     {
+        .device_name = "i2c0",
         .i2c = {
             .regs = (struct i2c_regs *)0x91405000U,
         },
         .i2c.scl_sda_cfg = {0},
         #ifdef RT_USING_I2C0_SLAVE
+        #ifndef RT_USING_I2C_SLAVE_EEPROM
+        #error RT_USING_I2C_SLAVE_EEPROM is required
+        #endif
         .slave = RT_TRUE,
         .slave_address = 0x20,
         .slave_callback = i2c_slave_eeprom_callback,
-        .device_name = "i2c0_slave",
+        .slave_callback_ctx = &eeprom,
         #else
-        .device_name = "i2c0",
         .slave = RT_FALSE,
         #endif
         .irq = 21,
@@ -376,72 +277,84 @@ static struct chip_i2c_bus i2c_buses[] =
 #endif
 #ifdef RT_USING_I2C1
     {
+        .device_name = "i2c1",
         .i2c = {
             .regs = (struct i2c_regs *)0x91406000U,
         },
         .i2c.scl_sda_cfg = {0},
         #ifdef RT_USING_I2C1_SLAVE
+        #ifndef RT_USING_I2C_SLAVE_EEPROM
+        #error RT_USING_I2C_SLAVE_EEPROM is required
+        #endif
         .slave = RT_TRUE,
         .slave_address = 0x21,
         .slave_callback = i2c_slave_eeprom_callback,
-        .device_name = "i2c1_slave",
+        .slave_callback_ctx = &eeprom,
         #else
         .slave = RT_FALSE,
-        .device_name = "i2c1",
         #endif
         .irq = 22,
     },
 #endif
 #ifdef RT_USING_I2C2
     {
+        .device_name = "i2c2",
         .i2c = {
             .regs = (struct i2c_regs *)0x91407000U,
         },
         .i2c.scl_sda_cfg = {0},
         #ifdef RT_USING_I2C2_SLAVE
+        #ifndef RT_USING_I2C_SLAVE_EEPROM
+        #error RT_USING_I2C_SLAVE_EEPROM is required
+        #endif
         .slave = RT_TRUE,
         .slave_address = 0x22,
         .slave_callback = i2c_slave_eeprom_callback,
-        .device_name = "i2c2_slave",
+        .slave_callback_ctx = &eeprom,
         #else
         .slave = RT_FALSE,
-        .device_name = "i2c2",
         #endif
         .irq = 23,
     },
 #endif
 #ifdef RT_USING_I2C3
     {
+        .device_name = "i2c3",
         .i2c = {
             .regs = (struct i2c_regs *)0x91408000U,
         },
         .i2c.scl_sda_cfg = {0},
         #ifdef RT_USING_I2C3_SLAVE
+        #ifndef RT_USING_I2C_SLAVE_EEPROM
+        #error RT_USING_I2C_SLAVE_EEPROM is required
+        #endif
         .slave = RT_TRUE,
         .slave_address = 0x23,
         .slave_callback = i2c_slave_eeprom_callback,
-        .device_name = "i2c3_slave",
+        .slave_callback_ctx = &eeprom,
         #else
         .slave = RT_FALSE,
-        .device_name = "i2c3",
         #endif
         .irq = 24,
     },
 #endif
 #ifdef RT_USING_I2C4
     {
+        .device_name = "i2c4",
         .i2c = {
             .regs = (struct i2c_regs *)0x91409000U,
         },
         .i2c.scl_sda_cfg = {0},
         #ifdef RT_USING_I2C4_SLAVE
+        #ifndef RT_USING_I2C_SLAVE_EEPROM
+        #error RT_USING_I2C_SLAVE_EEPROM is required
+        #endif
         .slave = RT_TRUE,
         .slave_address = 0x24,
         .slave_callback = i2c_slave_eeprom_callback,
-        .device_name = "i2c4_slave",
+        .slave_callback_ctx = &eeprom,
         #else
         .slave = RT_FALSE,
-        .device_name = "i2c4",
         #endif
         .irq = 25,
     },
@@ -451,6 +364,29 @@ static struct chip_i2c_bus i2c_buses[] =
 static rt_size_t get_timer(rt_size_t base)
 {
     return rt_tick_get() - base ;
+}
+
+static void dw_i2c_enable(struct i2c_regs *i2c_base, rt_bool_t enable)
+{
+    rt_uint32_t ena = enable ? IC_ENABLE_0B : 0;
+    int timeout = 100;
+
+    do
+    {
+        writel(ena, &i2c_base->ic_enable);
+        if ((readl(&i2c_base->ic_enable_status) & IC_ENABLE_0B) == ena) {
+            return;
+        }
+
+        /*
+         * Wait 10 times the signaling period of the highest I2C
+         * transfer supported by the driver (for 400KHz this is
+         * 25us) as described in the DesignWare I2C databook.
+         */
+        // udelay(25);
+    } while (timeout--);
+
+    LOG_D("timeout in %sabling I2C adapter\n", enable ? "en" : "dis");
 }
 
 /*
@@ -657,58 +593,32 @@ static int __dw_i2c_read(struct i2c_regs *i2c_base, rt_uint8_t dev, uint addr,
                          int alen, rt_uint8_t *buffer, int len, uint flags)
 {
     unsigned long start_time_rx;
-    unsigned int active = 0;
     int need_restart = 0;
-    int cut = 0;
+    int recv_len = len;
 
     if (flags & I2C_M_RESTART)
         need_restart = BIT(10);
     else if (i2c_xfer_init(i2c_base, dev, addr, alen) != 0)
-    {
         return -RT_EBUSY;
-    }
 
     start_time_rx = get_timer(0);
 
-    while (len)
+    while (len || recv_len)
     {
-        if (!active)
+        if (len)
         {
-            /*
-             * Avoid writing to ic_cmd_data multiple times
-             * in case this loop spins too quickly and the
-             * ic_status RFNE bit isn't set after the first
-             * write. Subsequent writes to ic_cmd_data can
-             * trigger spurious i2c transfer.
-             */
-            if (len == 1)
-            {
-                LOG_D("set IC_STOP");
-                writel(IC_CMD | IC_STOP | need_restart, &i2c_base->ic_cmd_data);
-            }
-            else
-            {
-                writel(IC_CMD | need_restart, &i2c_base->ic_cmd_data);
-            }
-
-            while( (readl(&i2c_base->ic_status) & IC_STATUS_TFE) != IC_STATUS_TFE)
-            {
-                cut = cut + 1;
-                i2c_delay_us(100);
-                if(cut > 100)
-                    break;
-            }
-
-            active = 1;
+            while((readl(&i2c_base->ic_status) & IC_STATUS_TFNF) != IC_STATUS_TFNF);
+            need_restart = len == 1 ? need_restart | IC_STOP : need_restart;
+            writel(IC_CMD | need_restart, &i2c_base->ic_cmd_data);
             need_restart = 0;
+            len--;
         }
 
         if (readl(&i2c_base->ic_status) & IC_STATUS_RFNE)
         {
             *buffer++ = (uchar)readl(&i2c_base->ic_cmd_data);
-            len--;
+            recv_len--;
             start_time_rx = get_timer(0);
-            active = 0;
         }
         else if (get_timer(start_time_rx) > I2C_BYTE_TO)
         {
@@ -765,6 +675,10 @@ static int __dw_i2c_write(struct i2c_regs *i2c_base, rt_uint8_t dev, uint addr,
             LOG_D("Timed out. i2c write Failed\n");
             return 1;
         }
+    }
+
+    if ((flags & I2C_M_STOP) == 0) {
+        return 0;
     }
 
     while( (readl(&i2c_base->ic_status) & IC_STATUS_TFE) != IC_STATUS_TFE)
@@ -862,15 +776,15 @@ static void dw_i2c_slave_isr(int irq, void *param) {
 		if (!(bus->slave_status & STATUS_WRITE_IN_PROGRESS)) {
 			bus->slave_status |= STATUS_WRITE_IN_PROGRESS;
 			bus->slave_status &= ~STATUS_READ_IN_PROGRESS;
-            bus->slave_callback(&bus->slave_device, I2C_SLAVE_WRITE_REQUESTED, &val);
+            bus->slave_callback(bus->slave_callback_ctx, I2C_SLAVE_WRITE_REQUESTED, &val);
 		}
 
 		do {
             tmp = readl(&i2c_base->ic_cmd_data);
 			if (tmp & DW_IC_DATA_CMD_FIRST_DATA_BYTE)
-                bus->slave_callback(&bus->slave_device, I2C_SLAVE_WRITE_REQUESTED, &val);
+                bus->slave_callback(bus->slave_callback_ctx, I2C_SLAVE_WRITE_REQUESTED, &val);
 			val = tmp;
-            bus->slave_callback(&bus->slave_device, I2C_SLAVE_WRITE_RECEIVED, &val);
+            bus->slave_callback(bus->slave_callback_ctx, I2C_SLAVE_WRITE_RECEIVED, &val);
             tmp = readl(&i2c_base->ic_status);
 		} while (tmp & DW_IC_STATUS_RFNE);
 	}
@@ -880,18 +794,18 @@ static void dw_i2c_slave_isr(int irq, void *param) {
             tmp = readl(&i2c_base->ic_clr_rd_req);
 
 			if (!(bus->slave_status & STATUS_READ_IN_PROGRESS)) {
-                bus->slave_callback(&bus->slave_device, I2C_SLAVE_READ_REQUESTED, &val);
+                bus->slave_callback(bus->slave_callback_ctx, I2C_SLAVE_READ_REQUESTED, &val);
 				bus->slave_status |= STATUS_READ_IN_PROGRESS;
 				bus->slave_status &= ~STATUS_WRITE_IN_PROGRESS;
 			} else {
-                bus->slave_callback(&bus->slave_device, I2C_SLAVE_READ_PROCESSED, &val);
+                bus->slave_callback(bus->slave_callback_ctx, I2C_SLAVE_READ_PROCESSED, &val);
 			}
             writel(val, &i2c_base->ic_cmd_data);
 		}
 	}
 
 	if (stat & DW_IC_INTR_STOP_DET)
-        bus->slave_callback(&bus->slave_device, I2C_SLAVE_STOP, &val);
+        bus->slave_callback(bus->slave_callback_ctx, I2C_SLAVE_STOP, &val);
 }
 
 static void dw_i2c_slave_init(struct chip_i2c_bus* bus) {
@@ -974,7 +888,16 @@ static int designware_i2c_set_bus_speed(struct chip_i2c_bus *bus, unsigned int s
         return -1;
     }
 
-    return __dw_i2c_set_bus_speed(i2c->regs, RT_NULL, speed);
+    struct dw_scl_sda_cfg scl_sda_cfg;
+    uint32_t period = (bus->clock / speed) - 20;
+
+    scl_sda_cfg.ss_lcnt = period / 2;
+    scl_sda_cfg.ss_hcnt = period - scl_sda_cfg.ss_lcnt;
+    scl_sda_cfg.fs_lcnt = scl_sda_cfg.ss_lcnt;
+    scl_sda_cfg.fs_hcnt = scl_sda_cfg.ss_hcnt;
+    scl_sda_cfg.sda_hold = 0;
+
+    return __dw_i2c_set_bus_speed(i2c->regs, &scl_sda_cfg, speed);
 }
 
 static rt_size_t chip_i2c_mst_xfer(struct rt_i2c_bus_device *bus,
@@ -1053,11 +976,10 @@ int rt_hw_i2c_init(void)
     {
         i2c_buses[i].i2c.regs = (struct i2c_regs *)rt_ioremap((void *)i2c_buses[i].i2c.regs, 0x10000);
         i2c_buses[i].parent.ops = &chip_i2c_ops;
+        i2c_buses[i].clock = sysctl_clk_get_leaf_freq(SYSCTL_CLK_I2C_0_CLK + i);
 
         if (i2c_buses[i].slave) {
             dw_i2c_slave_init(&i2c_buses[i]);
-            i2c_slave_eeprom_register(&i2c_buses[i].slave_device,i2c_buses[i].device_name);
-
         } else {
             dw_i2c_init((struct i2c_regs *)i2c_buses[i].i2c.regs);
             designware_i2c_set_bus_speed(&i2c_buses[i], I2C_FAST_SPEED);
@@ -1071,7 +993,7 @@ int rt_hw_i2c_init(void)
 
     return 0;
 }
-INIT_BOARD_EXPORT(rt_hw_i2c_init);
+INIT_DEVICE_EXPORT(rt_hw_i2c_init);
 
 #ifdef RT_USING_I2C_DUMP
 void i2c_reg_show(int argc, char *argv[])

@@ -6,6 +6,9 @@ cwd     = GetCurrentDir()
 src     = Glob('*.c') + Glob('*.S')
 CPPPATH = [cwd]
 
+if not GetDepend(['RT_USING_SOFT_I2C']):
+    SrcRemove(src, 'drv_soft_i2c.c')
+
 group = DefineGroup('I2C', src, depend = ['RT_USING_I2C'], CPPPATH = CPPPATH)
 
 objs = [group]

@@ -36,6 +36,11 @@ extern "C" {
 #define  RT_TOUCH_TYPE_CAPACITANCE       (1)  /* capacitance ic */
 #define  RT_TOUCH_TYPE_RESISTANCE        (2)  /* resistance ic */
 
+#define RT_TOUCH_ROTATE_DEGREE_0           (0)
+#define RT_TOUCH_ROTATE_DEGREE_90          (1)
+#define RT_TOUCH_ROTATE_DEGREE_180         (2)
+#define RT_TOUCH_ROTATE_DEGREE_270         (3)
+
 /* Touch control cmd types */
 #define  RT_TOUCH_CTRL_GET_ID            (RT_DEVICE_CTRL_BASE(Touch) + 0)   /* Get device id */
 #define  RT_TOUCH_CTRL_GET_INFO          (RT_DEVICE_CTRL_BASE(Touch) + 1)   /* Get touch info */
@@ -48,6 +53,8 @@ extern "C" {
 #define  RT_TOUCH_CTRL_POWER_ON          (RT_DEVICE_CTRL_BASE(Touch) + 8)   /* Touch Power On */
 #define  RT_TOUCH_CTRL_POWER_OFF         (RT_DEVICE_CTRL_BASE(Touch) + 9)   /* Touch Power Off */
 #define  RT_TOUCH_CTRL_GET_STATUS        (RT_DEVICE_CTRL_BASE(Touch) + 10)  /* Get Touch Power Status */
+#define  RT_TOUCH_CTRL_RESET             (RT_DEVICE_CTRL_BASE(Touch) + 11)  /* Hard or Soft Reset Touch Device */
+#define  RT_TOUCH_CTRL_GET_DFT_ROTATE    (RT_DEVICE_CTRL_BASE(Touch) + 12)  /* Get Default Rotate set */
 
 /* Touch event */
 #define RT_TOUCH_EVENT_NONE              (0)   /* Touch none */

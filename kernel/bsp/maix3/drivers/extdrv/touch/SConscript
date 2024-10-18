@@ -6,8 +6,13 @@ cwd     = GetCurrentDir()
 src     = []
 CPPPATH = [cwd]
 
-if GetDepend(['RT_USING_TOUCH_FT5316']):
+src += Glob('drv_touch.c')
+
+if GetDepend(['TOUCH_TYPE_FT5316']):
     src += Glob('ft5316.c')
+
+if GetDepend(['TOUCH_TYPE_CST128']):
+    src += Glob('cst128.c')
 
 group = DefineGroup('touch', src, depend = ['RT_USING_TOUCH'], CPPPATH = CPPPATH)
 
