@@ -105,7 +105,7 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
             point_y = tmp;
 #endif
 
-            point->event = RT_TOUCH_EVENT_NONE; // TODO
+            point->event = RT_TOUCH_EVENT_NONE;
             point->track_id = result_index;
             point->width = finger_num;
             point->x_coordinate = point_x;
@@ -113,6 +113,8 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
             point->timestamp = time;
         }
     }
+
+    touch_dev_update_event(finger_num, point);
 
     return 0;
 }

@@ -63,11 +63,27 @@ static struct drv_touch_dev touch_dev = {
     },
 };
 
+int touch_dev_write_reg(struct drv_touch_dev *dev, rt_uint8_t *buffer, rt_size_t length)
+{
+    struct rt_i2c_msg msg =
+    {
+        .addr   = dev->i2c.addr,
+        .flags  = RT_I2C_WR,
+        .buf    = buffer,
+        .len    = length,
+    };
+
+    if(0x01 == rt_i2c_transfer(dev->i2c.bus, &msg, 1)) {
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
 int touch_dev_read_reg(struct drv_touch_dev *dev, rt_uint8_t addr,
     rt_uint8_t *buffer, rt_size_t length)
 {
-    struct rt_i2c_msg msgs[2] =
-    {
+    struct rt_i2c_msg msgs[2] = {
         {
             .addr   = dev->i2c.addr,
             .flags  = RT_I2C_WR,
@@ -87,6 +103,76 @@ int touch_dev_read_reg(struct drv_touch_dev *dev, rt_uint8_t addr,
     } else {
         return -1;
     }
+}
+
+void touch_dev_update_event(int finger_num, struct rt_touch_data *point) {
+    static int last_finger_num = 0;
+    static struct rt_touch_data last_point[TOUCH_MAX_POINT_NUMBER];
+    static rt_tick_t last_timestamp = 0;  // Track the timestamp of the last touch event
+
+    rt_bool_t new_session = RT_FALSE;
+
+    // Check if too much time has passed since the last touch event
+    if (finger_num > 0 && (point[0].timestamp - last_timestamp > TOUCH_TIMEOUT_MS)) {
+        // A new touch event is considered after a timeout
+        new_session = RT_TRUE;
+        LOG_D("New touch session detected due to timeout.\n");
+
+        // If needed, mark all previous touches as lifted
+        for (int i = 0; i < last_finger_num; i++) {
+            last_point[i].event = RT_TOUCH_EVENT_UP;
+            LOG_D("Finger %d: Timeout - Finger lifted\n", last_point[i].track_id);
+        }
+
+        // Reset the last finger number since it's a new session
+        last_finger_num = 0;
+    }
+
+    // Update the timestamp of the last touch event
+    last_timestamp = point[0].timestamp;
+
+    // Process current touch data
+    for (int i = 0; i < finger_num; i++) {
+        struct rt_touch_data *current_point = &point[i];
+        struct rt_touch_data *last_touch = &last_point[i];
+
+        if (i < last_finger_num && !new_session) {
+            // Check if the touch point has moved
+            if (current_point->x_coordinate != last_touch->x_coordinate ||
+                current_point->y_coordinate != last_touch->y_coordinate) {
+                // Update event to move
+                current_point->event = RT_TOUCH_EVENT_MOVE;
+            }
+        } else {
+            // New finger detected or new session
+            current_point->event = RT_TOUCH_EVENT_DOWN;
+        }
+
+        // Print touch info for debugging (optional)
+        LOG_D("Finger %d: X = %d, Y = %d, Event = %d, Timestamp = %ld\n",
+               current_point->track_id,
+               current_point->x_coordinate,
+               current_point->y_coordinate,
+               current_point->event,
+               current_point->timestamp);
+
+        // Update the last point data
+        rt_memcpy(last_touch, current_point, sizeof(struct rt_touch_data));
+    }
+
+    // Check if fingers have been lifted
+    if (finger_num < last_finger_num && !new_session) {
+        for (int i = finger_num; i < last_finger_num; i++) {
+            struct rt_touch_data *last_touch = &last_point[i];
+            // Finger lifted
+            last_touch->event = RT_TOUCH_EVENT_UP;
+            LOG_D("Finger %d: Lifted, Event = %d, Timestamp = %ld\n",
+                   last_touch->track_id, last_touch->event, last_touch->timestamp);
+        }
+    }
+
+    // Update last finger number
+    last_finger_num = finger_num;
 }
 
 #ifdef TOUCH_DRV_MODEL_INT_WITH_THREAD

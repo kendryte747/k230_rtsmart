@@ -37,6 +37,7 @@
 #define TOUCH_MAX_POINT_NUMBER      5
 #define TOUCH_READ_REG_MAX_SIZE     32
 #define TOUCH_READ_MQ_MSG_COUNT     3
+#define TOUCH_TIMEOUT_MS            1000
 
 struct touch_register {
     rt_tick_t time;
@@ -99,8 +100,18 @@ struct drv_touch_dev {
 #endif
 };
 
+/**
+ * write slave, first byte should be register address.
+ */
+int touch_dev_write_reg(struct drv_touch_dev *dev, rt_uint8_t *buffer, rt_size_t length);
+
 int touch_dev_read_reg(struct drv_touch_dev *dev, rt_uint8_t addr,
     rt_uint8_t *buffer, rt_size_t length);
+
+/**
+ * For some touch device, which have no hardware event generate, such as CST128-A.
+ */
+void touch_dev_update_event(int finger_num, struct rt_touch_data *point);
 
 int drv_touch_init_ft5x16(struct drv_touch_dev *dev);
 int drv_touch_init_cst128(struct drv_touch_dev *dev);
