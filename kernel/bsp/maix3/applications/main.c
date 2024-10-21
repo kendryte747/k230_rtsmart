@@ -23,6 +23,7 @@
 
 #include "./config.h"
 #include "dfs_posix.h"
+#include "sdk_version.h"
 
 #ifdef CONFIG_BOARD_K230_CANMV_LCKFB
 #include "drv_gpio.h"
@@ -65,7 +66,7 @@ static const struct dfs_mount_tbl custom_mount_table[] = {
 
 #ifndef CHERRY_USB_DEVICE_ENABLE_CLASS_MTP
 bool g_fs_mount_data_succ = false;
-#endif 
+#endif
 
 static void mnt_mount_table(void)
 {
@@ -148,10 +149,15 @@ static void check_bank_voltage(void)
 
 int main(void) {
   check_bank_voltage();
-
+  rt_kprintf("\n#############SDK VERSION######################################\n");
+  rt_kprintf("SDK   : %s\n", SDK_VERSION_);
+  rt_kprintf("nncase: %s\n", NNCASE_VERSION_);
 #ifdef CONFIG_SDK_ENABLE_CANMV
-  rt_kprintf("CanMV Start\n");
+  rt_kprintf("CanMV : %s\n", CANMV_VERSION_);
 #endif //CONFIG_SDK_ENABLE_CANMV
+  rt_kprintf("##############################################################\n");
+
+
 
 #ifdef RT_USING_SDIO
   while (mmcsd_wait_cd_changed(100) != MMCSD_HOST_PLUGED) {
