@@ -121,7 +121,6 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
 
 static int reset(struct drv_touch_dev *dev) {
     if((0 <= dev->pin.rst) && (63 >= dev->pin.rst)) {
-        kd_pin_mode(dev->pin.rst, GPIO_DM_OUTPUT);
         kd_pin_write(dev->pin.rst, dev->pin.rst_valid);
         rt_thread_mdelay(10);
         kd_pin_write(dev->pin.rst, 1 - dev->pin.rst_valid);
