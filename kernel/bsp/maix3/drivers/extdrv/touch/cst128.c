@@ -97,14 +97,6 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
                 continue;
             }
 
-#if defined (CONFIG_BOARD_K230_CANMV_LCKFB)
-            uint16_t tmp;
-
-            tmp = point_x;
-            point_x = point_y;
-            point_y = tmp;
-#endif
-
             point->event = RT_TOUCH_EVENT_NONE;
             point->track_id = result_index;
             point->width = finger_num;
@@ -130,7 +122,7 @@ static int reset(struct drv_touch_dev *dev) {
 }
 
 static int get_default_rotate(struct drv_touch_dev *dev) {
-    return RT_TOUCH_ROTATE_DEGREE_0;
+    return RT_TOUCH_ROTATE_SWAP_XY;
 }
 
 int drv_touch_init_cst128(struct drv_touch_dev *dev) {

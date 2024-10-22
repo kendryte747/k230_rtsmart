@@ -40,6 +40,7 @@ extern "C" {
 #define RT_TOUCH_ROTATE_DEGREE_90          (1)
 #define RT_TOUCH_ROTATE_DEGREE_180         (2)
 #define RT_TOUCH_ROTATE_DEGREE_270         (3)
+#define RT_TOUCH_ROTATE_SWAP_XY            (4)
 
 /* Touch control cmd types */
 #define  RT_TOUCH_CTRL_GET_ID            (RT_DEVICE_CTRL_BASE(Touch) + 0)   /* Get device id */
