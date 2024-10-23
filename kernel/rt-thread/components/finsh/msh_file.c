@@ -137,6 +137,38 @@ int cmd_cat(int argc, char **argv)
 }
 MSH_CMD_EXPORT_ALIAS(cmd_cat, cat, Concatenate FILE(s));
 
+int cmd_rd(int argc, char **argv)
+{
+    extern void rd(char *dev_path);
+
+    if (argc != 2)
+    {
+        rt_kprintf("Usage: rd /dev/ttyUSB1\n");
+        return 0;
+    }
+
+    rd(argv[1]);
+
+    return 0;
+}
+MSH_CMD_EXPORT_ALIAS(cmd_rd, rd, rd /dev/ttyUSB1);
+
+int cmd_wr(int argc, char **argv)
+{
+    extern void wr(char *devname, char *data);
+
+    if (argc != 3)
+    {
+        rt_kprintf("Usage: wr /dev/ttyUSB1 [data]\n");
+        return 0;
+    }
+
+    wr(argv[1], argv[2]);
+
+    return 0;
+}
+MSH_CMD_EXPORT_ALIAS(cmd_wr, wr, wr /dev/ttyUSB1 [data]);
+
 static void msh_deltree(const char *pathname, char f, char v)
 {
     DIR *dir = NULL;
