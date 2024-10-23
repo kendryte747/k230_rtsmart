@@ -90,6 +90,18 @@ menu "Components Configuration"
                         bool "Enable net RTL8152"
                         default y
 
+                    menuconfig CHERRY_USB_HOST_ENABLE_CLASS_SERIAL
+                        bool "Enable SERIAL"
+                        default n
+
+                        if CHERRY_USB_HOST_ENABLE_CLASS_SERIAL
+
+                            config CHERRY_USB_HOST_ENABLE_CLASS_SERIAL_EC200M
+                            bool "Enable serial EC200M"
+                            default n
+
+                        endif
+
                     config CHERRY_USB_HOST_ENABLE_CLASS_CDC_ACM
                         bool "Enable cdc ACM"
                         default n

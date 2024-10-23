@@ -340,7 +340,17 @@ static void dwc2_halt(struct usbh_bus *bus, uint8_t ch_num)
     value = USB_OTG_HC(ch_num)->HCCHAR;
     value |= USB_OTG_HCCHAR_CHDIS;
     value &= ~USB_OTG_HCCHAR_CHENA;
+    /* *
+     * High probability cause halt channel fail then we can not reuse 
+     * this channel for other transfer, reproduce step just like below :
+     * 1. Submit bulk in urb and device have no data, so host NAK always
+     * 2. Kill bulk in urb in step 1
+     * 3. Submit bulk out urb which will reuse the channel step 1 used before
+     * 4. Bulk out urb will fail
+     * */
+#if 0
     value &= ~USB_OTG_HCCHAR_EPDIR;
+#endif
     USB_OTG_HC(ch_num)->HCCHAR = value;
     do {
         if (++count > 200000U) {
