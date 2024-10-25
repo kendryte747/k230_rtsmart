@@ -69,6 +69,10 @@ if GetDepend(['ENABLE_CHERRY_USB_HOST']):
     if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_NET_RTL8152']):
         src += Glob('class/vendor/net/usbh_rtl8152.c')
 
+    if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_SERIAL']):
+        if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_SERIAL_EC200M']):
+            src += Glob('class/vendor/serial/usbh_ec200m.c')
+
     if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_CDC_ACM']):
         src += Glob('class/cdc/usbh_cdc_acm.c')
 
