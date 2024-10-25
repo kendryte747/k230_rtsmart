@@ -137,7 +137,7 @@ static void check_bank_voltage(void)
   volatile rt_uint32_t read_result = *((rt_uint32_t *) virt_addr);
 
   if(0x00 == read_result) {
-#if !defined (BOARD_K230_CANMV) && !defined (BOARD_K230_CANMV_DONGSHANPI)
+#if !defined (CONFIG_BOARD_K230_CANMV) && !defined (CONFIG_BOARD_K230_CANMV_DONGSHANPI)
     rt_kprintf("\n\n\033[31mTHIS BOARD MAYBE NOT CONFIGURE BANK VOLTAGE!!!\n\n\033[0m");
 #endif
 
