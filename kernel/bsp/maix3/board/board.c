@@ -25,13 +25,7 @@
 #include "sysctl_boot.h"
 #include "rtconfig.h"
 
-
-#define MEMORY_RESERVED     0x1000
-
-
-
-
-
+#define MEMORY_RESERVED     (0x1000)
 
 #define RTT_SYS_BASE        (CONFIG_MEM_RTSMART_BASE + CONFIG_RTSMART_OPENSIB_MEMORY_SIZE)
 #define RTT_SYS_SIZE        ((((CONFIG_MEM_RTSMART_SIZE - CONFIG_RTSMART_OPENSIB_MEMORY_SIZE) / 1024) - 1) * 1024)
@@ -40,13 +34,10 @@
 #define RT_HEAP_SIZE        (CONFIG_MEM_RTSMART_HEAP_SIZE)
 
 #define RT_HW_HEAP_BEGIN    ((void *)&__bss_end)
-#define RT_HW_HEAP_END ((void *)(((rt_size_t)RT_HW_HEAP_BEGIN) + RT_HEAP_SIZE ))
+#define RT_HW_HEAP_END      ((void *)(((rt_size_t)RT_HW_HEAP_BEGIN) + RT_HEAP_SIZE ))
 
 #define RT_HW_PAGE_START    ((void *)((rt_size_t)RT_HW_HEAP_END + sizeof(rt_size_t)))
 #define RT_HW_PAGE_END      ((void *)(RAM_END))
-
-
-
 
 #ifdef RT_USING_USERSPACE
     #include "riscv_mmu.h"
@@ -63,14 +54,13 @@
 #endif
 
 #ifdef CONFIG_AUTO_DETECT_DDR_SIZE
-
-
 struct k230_ddr_size_tag_st{
   uint32_t flage;
   uint32_t shash;
   uint32_t resver;
   uint32_t ddr_size;
 };
+
 static uint32_t shash_len(const char *s,int len) {
   uint32_t v = 5381;
   int i = 0;
@@ -87,6 +77,7 @@ rt_size_t get_ddr_phy_size(void)
 
     struct k230_ddr_size_tag_st ddr_tag;
     int shash = 0;
+
     if(g_ddr_size == 0){
         memcpy(&ddr_tag, RTT_SYS_BASE - sizeof(ddr_tag), sizeof(ddr_tag));
         shash = ddr_tag.shash;
@@ -104,7 +95,7 @@ rt_size_t get_ddr_phy_size(void)
     return g_ddr_size;
 }
 
-rt_size_t  get_heap_size_by_ddr_size(void)
+rt_size_t  get_rtsmart_heap_size(void)
 {
     rt_size_t ret = 0x2000000;
     switch (get_ddr_phy_size())
@@ -129,6 +120,7 @@ rt_size_t  get_heap_size_by_ddr_size(void)
     }
     return ret;
 }
+
 rt_size_t get_rtsmart_sys_size(void)
 {
     rt_size_t ret = 0x10000000;
@@ -154,6 +146,7 @@ rt_size_t get_rtsmart_sys_size(void)
     }
     return ret;
 }
+
 rt_size_t get_mem_mmz_base(void)
 {
     rt_size_t ret = 0x10000000;
@@ -179,6 +172,7 @@ rt_size_t get_mem_mmz_base(void)
     }
     return ret;
 }
+
 rt_size_t get_mem_mmz_size(void)
 {
     rt_size_t ret = 0x10000000;
@@ -205,8 +199,27 @@ rt_size_t get_mem_mmz_size(void)
     }
     return ret;
 }
-#endif
+#else
+rt_size_t get_ddr_phy_size(void) {
+    return CONFIG_MEM_TOTAL_SIZE;
+}
 
+rt_size_t get_rtsmart_heap_size(void) {
+    return CONFIG_MEM_RTSMART_HEAP_SIZE;
+}
+
+rt_size_t get_rtsmart_sys_size(void) {
+    return CONFIG_MEM_RTSMART_SIZE;
+}
+
+rt_size_t get_mem_mmz_base(void) {
+    return CONFIG_MEM_MMZ_BASE;
+}
+
+rt_size_t get_mem_mmz_size(void) {
+    return CONFIG_MEM_MMZ_SIZE;
+}
+#endif
 
 //初始化BSS节区
 void init_bss(void)

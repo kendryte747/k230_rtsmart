@@ -16,18 +16,19 @@
 extern unsigned int __bss_start;
 extern unsigned int __bss_end;
 
-#ifdef CONFIG_AUTO_DETECT_DDR_SIZE
-extern rt_size_t  get_heap_size_by_ddr_size(void);
-extern  rt_size_t get_rtsmart_sys_size(void);
+extern rt_size_t get_ddr_phy_size(void);
+extern rt_size_t get_rtsmart_heap_size(void);
+extern rt_size_t get_rtsmart_sys_size(void);
 extern rt_size_t get_mem_mmz_base(void);
 extern rt_size_t get_mem_mmz_size(void);
-#define CONFIG_MEM_RTSMART_HEAP_SIZE  get_heap_size_by_ddr_size()
-#define CONFIG_MEM_RTSMART_SIZE  get_rtsmart_sys_size()
-#define CONFIG_MEM_MMZ_BASE get_mem_mmz_base()
-#define CONFIG_MEM_MMZ_SIZE get_mem_mmz_size()
+
+#ifdef CONFIG_AUTO_DETECT_DDR_SIZE
+    #define CONFIG_MEM_TOTAL_SIZE           get_ddr_phy_size()
+    #define CONFIG_MEM_RTSMART_HEAP_SIZE    get_rtsmart_heap_size()
+    #define CONFIG_MEM_RTSMART_SIZE         get_rtsmart_sys_size()
+    #define CONFIG_MEM_MMZ_BASE             get_mem_mmz_base()
+    #define CONFIG_MEM_MMZ_SIZE             get_mem_mmz_size()
 #endif
-
-
 
 void rt_hw_board_init(void);
 void rt_init_user_mem(struct rt_thread *thread, const char *name, unsigned long *entry);
