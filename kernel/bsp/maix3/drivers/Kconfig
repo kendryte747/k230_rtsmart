@@ -385,7 +385,15 @@ menu "Drivers Configuration"
                         bool "FT5316"
                     config TOUCH_TYPE_CST128
                         bool "CST128 - FT5316 Compatible"
+                    config TOUCH_TYPE_CHSC5XXX
+                        bool "CHSC5xxx"
                 endchoice
+
+                if TOUCH_TYPE_CHSC5XXX
+                    config TOUCH_CHSC5XXX_MAX_POINTS
+                        int "Maximum touch points supported by CHSC5xxx"
+                        default 5
+                endif
             endif
 
         menuconfig RT_USING_WS2812

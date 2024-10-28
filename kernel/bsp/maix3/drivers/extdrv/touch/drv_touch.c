@@ -432,6 +432,8 @@ static int drv_touch_init(void) {
     drv_touch_init_ft5x16(dev)
 #elif defined TOUCH_TYPE_CST128
     drv_touch_init_cst128(dev)
+#elif defined TOUCH_TYPE_CHSC5XXX
+    drv_touch_init_chsc5xxx(dev)
 #endif
     )
     {
