@@ -115,3 +115,4 @@ void touch_dev_update_event(int finger_num, struct rt_touch_data *point);
 
 int drv_touch_init_ft5x16(struct drv_touch_dev *dev);
 int drv_touch_init_cst128(struct drv_touch_dev *dev);
+int drv_touch_init_chsc5xxx(struct drv_touch_dev *dev);
