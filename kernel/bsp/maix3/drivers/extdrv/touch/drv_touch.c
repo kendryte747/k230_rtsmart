@@ -56,7 +56,7 @@ static struct drv_touch_dev touch_dev = {
 
     .i2c = {
         .name = TOUCH_DEV_I2C_BUS,
-        .addr = TOUCH_DEV_I2C_ADDR,
+        .addr = 0x00, // default set to zero
 #if defined (TOUCH_DEV_I2C_SET_SPEED)
         .speed = TOUCH_DEV_I2C_BUS_SPEED,
 #endif
@@ -84,11 +84,13 @@ int touch_dev_write_reg(struct drv_touch_dev *dev, rt_uint8_t *buffer, rt_size_t
 int touch_dev_read_reg(struct drv_touch_dev *dev, rt_uint8_t addr,
     rt_uint8_t *buffer, rt_size_t length)
 {
+    rt_uint8_t _addr = addr;
+
     struct rt_i2c_msg msgs[2] = {
         {
             .addr   = dev->i2c.addr,
             .flags  = RT_I2C_WR,
-            .buf    = &addr,
+            .buf    = &_addr,
             .len    = 1,
         },
         {
@@ -396,6 +398,19 @@ static struct rt_touch_ops drv_touch_ops = {
     .touch_control = drv_touch_control,
 };
 
+static const drv_touch_probe touch_probes[] = {
+#if defined TOUCH_TYPE_FT5316
+    drv_touch_probe_ft5x16,
+#endif // TOUCH_TYPE_FT5316
+#if defined TOUCH_TYPE_CST128
+    drv_touch_probe_cst128,
+#endif // TOUCH_TYPE_CST128
+#if defined TOUCH_TYPE_CHSC5XXX
+    drv_touch_probe_chsc5xxx,
+#endif // TOUCH_TYPE_CHSC5XXX
+    NULL
+};
+
 static int drv_touch_init(void) {
     int ret;
     struct drv_touch_dev *dev = &touch_dev;
@@ -422,23 +437,24 @@ static int drv_touch_init(void) {
         kd_pin_write(dev->pin.rst, 1 - dev->pin.rst_valid);
     }
 
+    for(int i = 0; touch_probes[i]; i++) {
+        if(0x00 == touch_probes[i](dev)) {
+            break;
+        }
+    }
+
+    if((NULL == dev->dev.read_register) || \
+        (0x00 >= rt_strlen(dev->dev.drv_name)) || \
+        (sizeof(dev->dev.drv_name) <= rt_strlen(dev->dev.drv_name)))
+    {
+        LOG_E("touch probe failed.");
+        return -4;
+    }
+    rt_kprintf("probe touch %s\n", dev->dev.drv_name);
+
     if((0 <= dev->pin.intr) && (63 >= dev->pin.intr)) {
         kd_pin_mode(dev->pin.intr, GPIO_DM_INPUT);
         kd_pin_attach_irq(dev->pin.intr, GPIO_PE_FALLING, touch_int_irq, dev);
-    }
-
-    if(0x00 != 
-#if defined TOUCH_TYPE_FT5316
-    drv_touch_init_ft5x16(dev)
-#elif defined TOUCH_TYPE_CST128
-    drv_touch_init_cst128(dev)
-#elif defined TOUCH_TYPE_CHSC5XXX
-    drv_touch_init_chsc5xxx(dev)
-#endif
-    )
-    {
-        LOG_E("Touch init device failed.");
-        return -4;
     }
 
 #ifdef TOUCH_DRV_MODEL_INT_WITH_THREAD

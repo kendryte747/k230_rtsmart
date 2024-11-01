@@ -51,12 +51,12 @@ struct chsc5xxx_reg {
 _Static_assert(CHSC5XXX_READ_REG_SIZE <= TOUCH_READ_REG_MAX_SIZE, "CHSC5XXX_READ_REG_SIZE > TOUCH_READ_REG_MAX_SIZE");
 
 static int chsc5xxx_read_reg(struct drv_touch_dev *dev, rt_uint32_t addr, rt_uint8_t *buffer, rt_size_t length) {
-    addr = ((addr & 0xFF000000) >> 24) | ((addr & 0x00FF0000) >> 8) | ((addr & 0x0000FF00) << 8) | ((addr & 0x000000FF) << 24);
+    rt_uint32_t _addr = ((addr & 0xFF000000) >> 24) | ((addr & 0x00FF0000) >> 8) | ((addr & 0x0000FF00) << 8) | ((addr & 0x000000FF) << 24);
     struct rt_i2c_msg msgs[2] = {
         {
             .addr   = dev->i2c.addr,
             .flags  = RT_I2C_WR,
-            .buf    = &addr,
+            .buf    = (rt_uint8_t *)&_addr,
             .len    = sizeof(addr),
         },
         {
@@ -153,6 +153,8 @@ static int reset(struct drv_touch_dev *dev) {
     rt_uint32_t validation;
 
     if((0 <= dev->pin.rst) && (63 >= dev->pin.rst)) {
+        kd_pin_write(dev->pin.rst, 1 - dev->pin.rst_valid);
+        rt_thread_mdelay(5);
         kd_pin_write(dev->pin.rst, dev->pin.rst_valid);
         rt_thread_mdelay(5);
         kd_pin_write(dev->pin.rst, 1 - dev->pin.rst_valid);
@@ -174,7 +176,41 @@ static int get_default_rotate(struct drv_touch_dev *dev) {
     return RT_TOUCH_ROTATE_DEGREE_270;
 }
 
-int drv_touch_init_chsc5xxx(struct drv_touch_dev *dev) {
+int drv_touch_probe_chsc5xxx(struct drv_touch_dev *dev) {
+    uint8_t data[8];
+
+    const char *chip_type[] = {
+        /*00H*/ "CHSC5472",
+        /*01H*/ "CHSC5448",
+        /*02H*/ "CHSC5448A",
+        /*03H*/ "CHSC5460",
+        /*04H*/ "CHSC5468",
+        /*05H*/ "CHSC5432",
+        /*10H*/ "CHSC5816",
+        /*11H*/ "CHSC1716",
+    };
+
+    dev->i2c.addr = 0x2e;
+
+    if (0 != chsc5xxx_read_reg(dev, 0x20000080, data, sizeof(data))) {
+        return -1;
+    }
+
+    switch(data[0]) {
+        case 0 ... 5:
+            rt_strncpy(dev->dev.drv_name, chip_type[data[0]], sizeof(dev->dev.drv_name));
+        break;
+        case 0x10:
+            rt_strncpy(dev->dev.drv_name, chip_type[6], sizeof(dev->dev.drv_name));
+        break;
+        case 0x11:
+            rt_strncpy(dev->dev.drv_name, chip_type[7], sizeof(dev->dev.drv_name));
+        break;
+        default:
+            rt_strncpy(dev->dev.drv_name, "CHSC5xxx", sizeof(dev->dev.drv_name));
+        break;
+    }
+
     dev->dev.read_register = read_register;
     dev->dev.parse_register = parse_register;
     dev->dev.reset = reset;

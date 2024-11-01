@@ -361,10 +361,6 @@ menu "Drivers Configuration"
                             default 400000
                     endif
 
-                config TOUCH_DEV_I2C_ADDR
-                    hex "Touch Device I2C Slave Address"
-                    default 0x38
-
                 config TOUCH_RANGE_X
                     int "Touch Range X, Origin of Touch Output"
                     default 480
@@ -377,17 +373,17 @@ menu "Drivers Configuration"
                     int "Touch Point Number"
                     default 5
 
-                choice TOUCH_TYPE
-                    bool "Touch Device Type"
-                    default TOUCH_TYPE_FT5316
+                config TOUCH_TYPE_FT5316
+                    bool "Enable Touch FT5316"
+                    default n
 
-                    config TOUCH_TYPE_FT5316
-                        bool "FT5316"
-                    config TOUCH_TYPE_CST128
-                        bool "CST128 - FT5316 Compatible"
-                    config TOUCH_TYPE_CHSC5XXX
-                        bool "CHSC5xxx"
-                endchoice
+                config TOUCH_TYPE_CST128
+                    bool "Enable Touch CST128 - FT5316 Compatible"
+                    default n
+
+                config TOUCH_TYPE_CHSC5XXX
+                    bool "Enable Touch CHSC5xxx"
+                    default n
 
                 if TOUCH_TYPE_CHSC5XXX
                     config TOUCH_CHSC5XXX_MAX_POINTS

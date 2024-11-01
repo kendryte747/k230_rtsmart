@@ -113,9 +113,12 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
 
 static int reset(struct drv_touch_dev *dev) {
     if((0 <= dev->pin.rst) && (63 >= dev->pin.rst)) {
+        kd_pin_write(dev->pin.rst, 1 - dev->pin.rst_valid);
+        rt_thread_mdelay(20);
         kd_pin_write(dev->pin.rst, dev->pin.rst_valid);
         rt_thread_mdelay(10);
         kd_pin_write(dev->pin.rst, 1 - dev->pin.rst_valid);
+        rt_thread_mdelay(50);
     }
 
     return 0;
@@ -125,11 +128,41 @@ static int get_default_rotate(struct drv_touch_dev *dev) {
     return RT_TOUCH_ROTATE_SWAP_XY;
 }
 
-int drv_touch_init_cst128(struct drv_touch_dev *dev) {
+int drv_touch_probe_cst128(struct drv_touch_dev *dev) {
+    uint8_t chip_id;
+    struct touch_register reg_data;
+
+#if defined CONFIG_BOARD_K230_CANMV_LCKFB
+    rt_thread_mdelay(50);
+#endif
+
+    dev->i2c.addr = 0x38;
+
+    if(0x00 != touch_dev_read_reg(dev, 0xA3, &chip_id, 1)) {
+        LOG_E("%s->%d\n", __func__, __LINE__);
+        return -2;
+    }
+
+#if defined CONFIG_BOARD_K230_CANMV_01STUDIO
+    if(0x64 != chip_id) {
+#elif defined CONFIG_BOARD_K230_CANMV_LCKFB
+    if(0x54 != chip_id) {
+#endif
+        LOG_E("cst128 id error, %02X", chip_id);
+        return -3;
+    }
+
+    rt_strncpy(dev->dev.drv_name, "cst128", sizeof(dev->dev.drv_name));
+
     dev->dev.read_register = read_register;
     dev->dev.parse_register = parse_register;
     dev->dev.reset = reset;
     dev->dev.get_default_rotate = get_default_rotate;
+
+#if defined CONFIG_BOARD_K230_CANMV_01STUDIO
+    dev->touch.range_x = 480;
+    dev->touch.range_y = 640;
+#endif
 
     return 0;
 }
