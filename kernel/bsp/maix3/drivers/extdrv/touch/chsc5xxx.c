@@ -150,8 +150,6 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
 }
 
 static int reset(struct drv_touch_dev *dev) {
-    rt_uint32_t validation;
-
     if((0 <= dev->pin.rst) && (63 >= dev->pin.rst)) {
         kd_pin_write(dev->pin.rst, 1 - dev->pin.rst_valid);
         rt_thread_mdelay(5);
@@ -159,14 +157,6 @@ static int reset(struct drv_touch_dev *dev) {
         rt_thread_mdelay(5);
         kd_pin_write(dev->pin.rst, 1 - dev->pin.rst_valid);
         rt_thread_mdelay(100);
-    }
-
-    if (0 != chsc5xxx_read_reg(dev, 0x20000018, (rt_uint8_t *)&validation, sizeof(validation))) {
-        return -1;
-    }
-
-    if (0x43534843 != validation) {
-        return -1;
     }
 
     return 0;
@@ -177,7 +167,7 @@ static int get_default_rotate(struct drv_touch_dev *dev) {
 }
 
 int drv_touch_probe_chsc5xxx(struct drv_touch_dev *dev) {
-    uint8_t data[8];
+    rt_uint8_t data[8];
 
     const char *chip_type[] = {
         /*00H*/ "CHSC5472",
@@ -191,6 +181,8 @@ int drv_touch_probe_chsc5xxx(struct drv_touch_dev *dev) {
     };
 
     dev->i2c.addr = 0x2e;
+
+    rt_thread_mdelay(100);
 
     if (0 != chsc5xxx_read_reg(dev, 0x20000080, data, sizeof(data))) {
         return -1;
