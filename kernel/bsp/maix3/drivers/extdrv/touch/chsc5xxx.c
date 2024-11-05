@@ -81,12 +81,12 @@ static int read_register(struct drv_touch_dev *dev, struct touch_register *reg) 
 }
 
 static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg, struct touch_point *result) {
-    const uint8_t event[4] = {RT_TOUCH_EVENT_DOWN, RT_TOUCH_EVENT_UP, RT_TOUCH_EVENT_MOVE, RT_TOUCH_EVENT_NONE};
+    const rt_uint8_t event[4] = {RT_TOUCH_EVENT_DOWN, RT_TOUCH_EVENT_UP, RT_TOUCH_EVENT_MOVE, RT_TOUCH_EVENT_NONE};
     
-    int finger_num;
-    uint8_t xh, xl, yh, yl, flg, id;
-    uint16_t point_x, point_y;
-    int result_index = 0, point_index = 0;
+    rt_uint8_t finger_num = 0;
+    rt_uint8_t xh, xl, yh, yl, flg, id;
+    rt_uint16_t point_x, point_y;
+    rt_uint8_t result_index = 0, point_index = 0;
 
     rt_tick_t time = reg->time;
 
@@ -98,11 +98,10 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
         return 0;
     }
 
-    finger_num = chsc5xxx_reg->finger_num;
-
-    if(finger_num > TOUCH_CHSC5XXX_MAX_POINTS) {
-        result->point_num = 0;
-        return 0;
+    for (result_index = 0; result_index < TOUCH_CHSC5XXX_MAX_POINTS; result_index++) {
+        if (chsc5xxx_reg->pos[result_index].id != 0xFF) {
+            finger_num++;
+        }
     }
 
     if(finger_num > TOUCH_MAX_POINT_NUMBER) {
@@ -127,7 +126,7 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
 
             yh = chsc5xxx_reg->pos[result_index].yh & 0x0F;
             yl = chsc5xxx_reg->pos[result_index].yl;
-
+            
             point_y = (yh << 8) | yl;
             if(point_y > dev->touch.range_y) {
                 point_index--;
@@ -150,8 +149,6 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
 }
 
 static int reset(struct drv_touch_dev *dev) {
-    rt_uint32_t validation;
-
     if((0 <= dev->pin.rst) && (63 >= dev->pin.rst)) {
         kd_pin_write(dev->pin.rst, 1 - dev->pin.rst_valid);
         rt_thread_mdelay(5);
@@ -159,14 +156,6 @@ static int reset(struct drv_touch_dev *dev) {
         rt_thread_mdelay(5);
         kd_pin_write(dev->pin.rst, 1 - dev->pin.rst_valid);
         rt_thread_mdelay(100);
-    }
-
-    if (0 != chsc5xxx_read_reg(dev, 0x20000018, (rt_uint8_t *)&validation, sizeof(validation))) {
-        return -1;
-    }
-
-    if (0x43534843 != validation) {
-        return -1;
     }
 
     return 0;
@@ -177,7 +166,7 @@ static int get_default_rotate(struct drv_touch_dev *dev) {
 }
 
 int drv_touch_probe_chsc5xxx(struct drv_touch_dev *dev) {
-    uint8_t data[8];
+    rt_uint8_t data[8];
 
     const char *chip_type[] = {
         /*00H*/ "CHSC5472",
@@ -191,6 +180,8 @@ int drv_touch_probe_chsc5xxx(struct drv_touch_dev *dev) {
     };
 
     dev->i2c.addr = 0x2e;
+
+    rt_thread_mdelay(100);
 
     if (0 != chsc5xxx_read_reg(dev, 0x20000080, data, sizeof(data))) {
         return -1;
