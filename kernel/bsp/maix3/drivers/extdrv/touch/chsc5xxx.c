@@ -81,12 +81,12 @@ static int read_register(struct drv_touch_dev *dev, struct touch_register *reg) 
 }
 
 static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg, struct touch_point *result) {
-    const uint8_t event[4] = {RT_TOUCH_EVENT_DOWN, RT_TOUCH_EVENT_UP, RT_TOUCH_EVENT_MOVE, RT_TOUCH_EVENT_NONE};
+    const rt_uint8_t event[4] = {RT_TOUCH_EVENT_DOWN, RT_TOUCH_EVENT_UP, RT_TOUCH_EVENT_MOVE, RT_TOUCH_EVENT_NONE};
     
-    int finger_num;
-    uint8_t xh, xl, yh, yl, flg, id;
-    uint16_t point_x, point_y;
-    int result_index = 0, point_index = 0;
+    rt_uint8_t finger_num = 0;
+    rt_uint8_t xh, xl, yh, yl, flg, id;
+    rt_uint16_t point_x, point_y;
+    rt_uint8_t result_index = 0, point_index = 0;
 
     rt_tick_t time = reg->time;
 
@@ -98,11 +98,10 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
         return 0;
     }
 
-    finger_num = chsc5xxx_reg->finger_num;
-
-    if(finger_num > TOUCH_CHSC5XXX_MAX_POINTS) {
-        result->point_num = 0;
-        return 0;
+    for (result_index = 0; result_index < TOUCH_CHSC5XXX_MAX_POINTS; result_index++) {
+        if (chsc5xxx_reg->pos[result_index].id != 0xFF) {
+            finger_num++;
+        }
     }
 
     if(finger_num > TOUCH_MAX_POINT_NUMBER) {
@@ -127,7 +126,7 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
 
             yh = chsc5xxx_reg->pos[result_index].yh & 0x0F;
             yl = chsc5xxx_reg->pos[result_index].yl;
-
+            
             point_y = (yh << 8) | yl;
             if(point_y > dev->touch.range_y) {
                 point_index--;
