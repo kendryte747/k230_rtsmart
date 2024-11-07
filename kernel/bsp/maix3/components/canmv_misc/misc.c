@@ -130,6 +130,8 @@ static int misc_close(struct dfs_fd *file) { return 0; }
 #define MISC_DEV_CMD_GET_TIME_T         (0x1024 + 4)
 #define MISC_DEV_CMD_GET_CPU_TICK       (0x1024 + 5)
 #define MISC_DEV_CMD_GET_MEMORY_SIZE    (0x1024 + 6)
+#define MISC_DEV_CMD_CREATE_SOFT_I2C    (0x1024 + 7)
+#define MISC_DEV_CMD_DELETE_SOFT_I2C    (0x1024 + 8)
 
 struct meminfo_t {
   size_t total_size;
@@ -302,6 +304,40 @@ static int misc_get_memory_size(void *args) {
   return 0;
 }
 
+static int misc_create_soft_i2c_device(void *args) {
+  struct soft_i2c_configure {
+    uint32_t bus_num;
+    uint32_t pin_scl;
+    uint32_t pin_sda;
+    uint32_t freq;
+    uint32_t timeout_ms;
+  };
+
+  struct soft_i2c_configure cfg = {0};
+
+  if(sizeof(cfg) != lwp_get_from_user(&cfg, args, sizeof(cfg))) {
+    rt_kprintf("%s get_frome_user failed\n", __func__);
+    return -1;
+  }
+
+  uint32_t timeout_tick = rt_tick_from_millisecond(cfg.timeout_ms);
+
+  extern int rt_soft_i2c_add_dev(int bus_num, int scl, int sda, uint32_t freq, uint32_t timeout);
+  return rt_soft_i2c_add_dev(cfg.bus_num, cfg.pin_scl, cfg.pin_sda, cfg.freq, timeout_tick);
+}
+
+static int misc_delete_soft_i2c_device(void *args) {
+  uint32_t bus_num = 0;
+
+  if(sizeof(bus_num) != lwp_get_from_user(&bus_num, args, sizeof(bus_num))) {
+    rt_kprintf("%s get_frome_user failed\n", __func__);
+    return -1;
+  }
+
+  extern int rt_soft_i2c_del_dev(int bus_num);
+  return rt_soft_i2c_del_dev(bus_num);
+}
+
 static const struct misc_dev_handle misc_handles[] = {
   {
     .cmd = MISC_DEV_CMD_READ_HEAP,
@@ -330,6 +366,14 @@ static const struct misc_dev_handle misc_handles[] = {
   {
     .cmd = MISC_DEV_CMD_GET_MEMORY_SIZE,
     .func = misc_get_memory_size,
+  },
+  {
+    .cmd = MISC_DEV_CMD_CREATE_SOFT_I2C,
+    .func = misc_create_soft_i2c_device,
+  },
+  {
+    .cmd = MISC_DEV_CMD_DELETE_SOFT_I2C,
+    .func = misc_delete_soft_i2c_device,
   }
 };
 
