@@ -305,6 +305,7 @@ static int misc_get_memory_size(void *args) {
 }
 
 static int misc_create_soft_i2c_device(void *args) {
+#if defined (RT_USING_SOFT_I2C)
   struct soft_i2c_configure {
     uint32_t bus_num;
     uint32_t pin_scl;
@@ -324,9 +325,15 @@ static int misc_create_soft_i2c_device(void *args) {
 
   extern int rt_soft_i2c_add_dev(int bus_num, int scl, int sda, uint32_t freq, uint32_t timeout);
   return rt_soft_i2c_add_dev(cfg.bus_num, cfg.pin_scl, cfg.pin_sda, cfg.freq, timeout_tick);
+#else
+  rt_kprintf("please enable soft i2c\n");
+
+  return -1;
+#endif // RT_USING_SOFT_I2C
 }
 
 static int misc_delete_soft_i2c_device(void *args) {
+#if defined (RT_USING_SOFT_I2C)
   uint32_t bus_num = 0;
 
   if(sizeof(bus_num) != lwp_get_from_user(&bus_num, args, sizeof(bus_num))) {
@@ -336,6 +343,11 @@ static int misc_delete_soft_i2c_device(void *args) {
 
   extern int rt_soft_i2c_del_dev(int bus_num);
   return rt_soft_i2c_del_dev(bus_num);
+#else
+  rt_kprintf("please enable soft i2c\n");
+
+  return -1;
+#endif // RT_USING_SOFT_I2C
 }
 
 static const struct misc_dev_handle misc_handles[] = {
