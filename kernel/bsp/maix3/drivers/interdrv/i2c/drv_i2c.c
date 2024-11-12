@@ -889,7 +889,9 @@ static int designware_i2c_set_bus_speed(struct chip_i2c_bus *bus, unsigned int s
     }
 
     struct dw_scl_sda_cfg scl_sda_cfg;
-    uint32_t period = (bus->clock / speed) - 20;
+
+    uint32_t period = bus->clock / speed;
+    period = period - 20;
 
     scl_sda_cfg.ss_lcnt = period / 2;
     scl_sda_cfg.ss_hcnt = period - scl_sda_cfg.ss_lcnt;
