@@ -25,12 +25,12 @@ if GetDepend(['CHERRY_USB_OSAL_RTTHREAD']):
     path += [cwd + '/osal']
     src += Glob('osal/usb_osal_rtthread.c')
 
+if GetDepend(['CHERRY_USB_SPEED_HS']):
+    CPPDEFINES+=['CONFIG_USB_HS']
+
 # USB DEVICE
 if GetDepend(['ENABLE_CHERRY_USB_DEVICE']):
     src += Glob('core/usbd_core.c')
-
-    if GetDepend(['CHERRY_USB_DEVICE_SPEED_HS']):
-        CPPDEFINES+=['CONFIG_USB_HS']
 
     if GetDepend(['CHERRYUSB_DEVICE_DWC2_K230']):
         src += Glob('port/dwc2/usb_dc_dwc2.c')

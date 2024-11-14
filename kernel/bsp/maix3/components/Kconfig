@@ -13,6 +13,9 @@ menu "Components Configuration"
             config CHERRY_USB_OSAL_RTTHREAD
                 def_bool y
 
+            config CHERRY_USB_SPEED_HS
+                def_bool y
+
             menuconfig ENABLE_CHERRY_USB_DEVICE
                 bool "Enable CherryUSB Device"
                 default n
@@ -33,9 +36,6 @@ menu "Components Configuration"
                         int
                         default 0 if CHERRY_USB_DEVICE_USING_DEV0
                         default 1 if CHERRY_USB_DEVICE_USING_DEV1
-
-                    config CHERRY_USB_DEVICE_SPEED_HS
-                        def_bool y
 
                     config CHERRY_USB_DEVICE_ENABLE_CLASS_CDC_ACM
                         bool "Enable CDC ACM"
