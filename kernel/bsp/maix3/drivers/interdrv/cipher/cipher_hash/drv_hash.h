@@ -23,15 +23,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __DRV_HASH256__
-#define __DRV_HASH256__
+#ifndef __DRV_HASH__
+#define __DRV_HASH__
 #include <stdint.h>
 
-#define RT_HWHASH_CTRL_INIT             _IOWR('H', 0, int)
-#define RT_HWHASH_CTRL_UPDATE           _IOWR('H', 1, int)
-#define RT_HWHASH_CTRL_FINISH           _IOWR('H', 2, int)
-
-#define K230_HASH_NAME                  "hwhash"
+#define K230_HASH_NAME                  "hash"
+#define RT_HASH_INIT                    _IOWR('H', 0, int)
+#define RT_HASH_UPDATE                  _IOWR('H', 1, int)
+#define RT_HASH_FINAL                   _IOWR('H', 2, int)
+#define RT_HASH_FAST_DOUBLE             _IOWR('H', 4, int)
 #define HMAC_SW_KEY_MAXLEN              64
 #define HMAC_BLOCK_MAXLEN               128
 #define DGST_INT_STATE_LEN              64
@@ -137,6 +137,7 @@ struct hash_context
     hmac_op op;
     k_pufs_hash_t hash;
     rt_bool_t start;
+    rt_bool_t busy;
 };
 
 /* Message digest structure. */
@@ -159,12 +160,25 @@ typedef struct
     k_segstr seg[3];
 } k_blsegs;
 
-struct rt_hash_config_args
+union rt_hash_control_args
 {
-    void *msg;
-    void *dgst;
-    rt_uint32_t msglen;
-    rt_uint32_t dlen;
+    struct {
+        rt_uint8_t mode;
+    } init;
+    struct {
+        rt_uint8_t *msg;
+        rt_uint32_t msglen;
+    } update;
+    struct {
+        rt_uint8_t *dgst;
+        rt_uint32_t dlen;
+    } final;
+    struct {
+        rt_uint8_t *msg;
+        rt_uint32_t msglen;
+        rt_uint8_t *dgst;
+        rt_uint32_t dlen;
+    } fast;
 };
 
-#endif  /*__DRV_HASH256__*/
+#endif  /*__DRV_HASH__*/

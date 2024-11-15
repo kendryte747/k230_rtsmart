@@ -13,7 +13,7 @@ menu "Drivers Configuration"
                 config RT_USING_AES
                     bool "Use HW AES accelerator"
                     default n
-                config RT_USING_HWHASH
+                config RT_USING_HASH
                     bool "Use HW SHA256 accelerator"
                     default n
                 config RT_USING_SM4
@@ -30,9 +30,13 @@ menu "Drivers Configuration"
             default n
 
         config RT_USING_HARDLOCK
-            bool "Enable HardLock driver"
+            bool "Enable HardLock Driver"
             default n
-                
+
+        config RT_USING_PDMA
+            bool "Enable PDMA Driver"
+            default n
+
         menuconfig RT_USING_HWTIMER
             bool "Using hardware timer device drivers"
             default n

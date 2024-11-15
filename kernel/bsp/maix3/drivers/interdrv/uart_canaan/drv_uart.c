@@ -28,6 +28,8 @@
 #include <ioremap.h>
 #include "board.h"
 #include "drv_uart.h"
+#include "drv_pdma.h"
+#include <cache.h>
 #include "riscv_io.h"
 #include "board.h"
 #include "sysctl_clk.h"
@@ -118,6 +120,7 @@
 #define	IOC_SET_BAUDRATE            _IOW('U', 0x40, int)
 
 #define DEFAULT_BAUDRATE      (115200)
+#define UART0_IRQ              0x10
 #define UART1_IRQ              0x11
 #define UART2_IRQ              0x12
 #define UART3_IRQ              0x13
@@ -127,12 +130,9 @@ struct kd_uart_device {
     struct rt_device kd_uart;
     volatile void *base;
     struct rt_serial_rx_fifo *kd_rx_fifo;
-    struct rt_timer timer;
     volatile uint8_t t_flag;
     int id;
 };
-
-static uint32_t timeout = UART_TIMEOUT;
 
 #define write32(addr, val) writel(val, (void*)(addr))
 #define read32(addr) readl((void*)(addr))
@@ -143,7 +143,6 @@ static int uart_fops_open(struct dfs_fd *fd)
     RT_ASSERT(uart != RT_NULL);
     struct kd_uart_device *kd_uart_device = (struct kd_uart_device *)uart->user_data;
 
-    rt_timer_start(&kd_uart_device->timer);
     return 0;
 }
 
@@ -153,7 +152,6 @@ static int uart_fops_close(struct dfs_fd *fd)
     RT_ASSERT(uart != RT_NULL);
     struct kd_uart_device *kd_uart_device = (struct kd_uart_device *)uart->user_data;
 
-    rt_timer_stop(&kd_uart_device->timer);
     return 0;
 }
 
@@ -163,9 +161,7 @@ static int uart_fops_ioctl(struct dfs_fd *fd, int cmd, void *args)
     RT_ASSERT(uart != RT_NULL);
 
     if (uart->ops->control)
-    {
         return uart->ops->control(uart, cmd, args);
-    }
 
     return -RT_EINVAL;
 }
@@ -177,78 +173,46 @@ static int uart_fops_read(struct dfs_fd *fd, void *buf, size_t count)
     RT_ASSERT(uart != RT_NULL);
 
     struct kd_uart_device *kd_uart_device = (struct kd_uart_device *)uart->user_data;
-    struct rt_serial_rx_fifo *kd_rx_fifo = kd_uart_device->kd_rx_fifo;
-
 
     if (uart->ops->read)
-    {
         ret = uart->ops->read(uart, 0, buf, count);
-    }
 
-    rt_base_t level;
-    level = rt_hw_interrupt_disable();
-
-    if (kd_rx_fifo->put_index == kd_rx_fifo->get_index)
-    {        
-        kd_uart_device->t_flag = 0;
-    }
-
-    rt_hw_interrupt_enable(level);
     return ret;
 }
 
 static int uart_fops_write(struct dfs_fd *fd, const void *buf, size_t count)
 {
+    int ret = 0;
     rt_device_t uart = (rt_device_t)fd->fnode->data;
     RT_ASSERT(uart != RT_NULL);
 
     if (uart->ops->write)
-    {
-        uart->ops->write(uart, 0, buf, count);
-    }
+        ret = uart->ops->write(uart, 0, buf, count);
+
+    return ret;
 }
 
 static int uart_fops_poll(struct dfs_fd *fd, struct rt_pollreq *req)
 {
-    int flags = 0;
     rt_device_t uart = (rt_device_t)fd->fnode->data;
     RT_ASSERT(uart != RT_NULL);
 
     struct kd_uart_device *kd_uart_device = (struct kd_uart_device *)uart->user_data;
     struct rt_serial_rx_fifo *kd_rx_fifo = kd_uart_device->kd_rx_fifo;
-
     rt_base_t level;
-    level = rt_hw_interrupt_disable();
+    int flag = 0;
+
     rt_poll_add(&(uart->wait_queue), req);
-
-    if (kd_uart_device->t_flag)
-    {
-        kd_uart_device->t_flag = 0;
-        return POLLIN;
-    } else
-    if ((kd_rx_fifo->put_index - kd_rx_fifo->get_index) > 0)
-    {
-        if ((kd_rx_fifo->put_index - kd_rx_fifo->get_index) >= POLLIN_SIZE)
-        {
-            kd_uart_device->t_flag = 0;
-            return POLLIN;
-        }
-    } else
-    if ((kd_rx_fifo->get_index - kd_rx_fifo->put_index) > 0)
-    {
-        if (CANAAN_UART_BUFFER_SIZE - (kd_rx_fifo->get_index - kd_rx_fifo->put_index) >= POLLIN_SIZE)
-        {
-            kd_uart_device->t_flag = 0;
-            return POLLIN;
-        }
-    }
-
+    level = rt_hw_interrupt_disable();
+    if ((kd_rx_fifo->get_index == kd_rx_fifo->put_index) && (kd_rx_fifo->is_full == RT_FALSE))
+        kd_uart_device->t_flag = 1;
+    else
+        flag = POLLIN;
     rt_hw_interrupt_enable(level);
-    return 0;
+    return flag;
 }
 
-const static struct dfs_file_ops _uart_fops =
-{
+const static struct dfs_file_ops _uart_fops = {
     uart_fops_open,
     uart_fops_close,
     uart_fops_ioctl,
@@ -298,7 +262,7 @@ static void kd_uart_init(volatile void *uart_base, int index)
     /* 8 bits, no parity, one stop bit */
     write32(uart_base + UART_LCR, 0x03);
     /* Enable FIFO */
-    write32(uart_base + UART_FCR, 0x01 | UART_RECEIVE_FIFO_16 << 6);
+    write32(uart_base + UART_FCR, 0x3f | UART_RECEIVE_FIFO_16 << 6);
     /* No modem control DTR RTS */
     write32(uart_base + UART_MCR, 0x00);
     /* Clear line status */
@@ -310,7 +274,7 @@ static void kd_uart_init(volatile void *uart_base, int index)
     /* Set scratchpad */
     write32(uart_base + UART_SCH, 0x00);
     //enable uart rx irq
-    write32(uart_base + UART_IER, 0x01);
+    write32(uart_base + UART_IER, 0x81);
 }
 
 static rt_err_t uart_open(rt_device_t dev, rt_uint16_t oflag)
@@ -332,19 +296,18 @@ static rt_size_t uart_read(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_
     uint8_t *data;
 
     RT_ASSERT(dev != RT_NULL);
-    if (size == 0) return 0;
+    if (size == 0)
+        return 0;
 
     length = size;
     data = (uint8_t*)buffer;
 
-    while (length)
-    {
+    while (length) {
         uint32_t ch;
         rt_base_t level;
         level = rt_hw_interrupt_disable();
 
-        if ((kd_rx_fifo->get_index == kd_rx_fifo->put_index) && (kd_rx_fifo->is_full == RT_FALSE))
-        {
+        if ((kd_rx_fifo->get_index == kd_rx_fifo->put_index) && (kd_rx_fifo->is_full == RT_FALSE)) {
             /* no data, enable interrupt and break out */
             rt_hw_interrupt_enable(level);
             break;
@@ -353,18 +316,16 @@ static rt_size_t uart_read(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_
         ch = kd_rx_fifo->buffer[kd_rx_fifo->get_index];
         kd_rx_fifo->get_index += 1;
 
-        if (kd_rx_fifo->get_index >= CANAAN_UART_BUFFER_SIZE) kd_rx_fifo->get_index = 0;
+        if (kd_rx_fifo->get_index >= CANAAN_UART_BUFFER_SIZE)
+            kd_rx_fifo->get_index = 0;
 
         if (kd_rx_fifo->is_full == RT_TRUE)
-        {
             kd_rx_fifo->is_full = RT_FALSE;
-        }
 
         rt_hw_interrupt_enable(level);
 
         *data = ch & 0xff;
         data ++; length --;
-
     }
     return size - length;
 }
@@ -373,28 +334,36 @@ static rt_size_t uart_write(rt_device_t dev, rt_off_t pos, const void *buffer, r
 {
     struct kd_uart_device *kd_uart_device = (struct kd_uart_device *)dev->user_data;
     volatile void *base_addr = kd_uart_device->base;
+    int id = kd_uart_device->id;
+    uint32_t len = RT_ALIGN(size, 64);
+    uint8_t *buf = rt_malloc_align(len, 64);
+    rt_memcpy(buf, buffer, size);
+    rt_hw_cpu_dcache_clean((void*)buf, len);
+    usr_pdma_cfg_t pdma_cfg;
+    pdma_cfg.ch = id + 2; //Reserve 2 channels for Linux I2S to use
+    pdma_cfg.device = id * 2;
+    pdma_cfg.src_addr = buf;
+    pdma_cfg.dst_addr = 0x91400000 + id * 0x1000 + 0x30;
+    pdma_cfg.line_size = size;
+    pdma_cfg.pdma_ch_cfg.ch_src_type = TX;
+    pdma_cfg.pdma_ch_cfg.ch_dev_hsize = PSBYTE1;
+    pdma_cfg.pdma_ch_cfg.ch_dat_endian = PDEFAULT;
+    pdma_cfg.pdma_ch_cfg.ch_dev_blen = PBURST_LEN_16;
+    pdma_cfg.pdma_ch_cfg.ch_priority = 7;
+    pdma_cfg.pdma_ch_cfg.ch_dev_tout = 0xFFF;
+    while (k_pdma_config(pdma_cfg) != 0)
+        rt_thread_mdelay(10);
+    k_pdma_start(pdma_cfg.ch);
+    while (!(k_pdma_interrupt_stat() & (PDONE_INT << pdma_cfg.ch)));
+    k_pdma_int_clear(pdma_cfg.ch, PDONE_INT | PITEM_INT | PPAUSE_INT | PTOUT_INT);
+    k_pdma_llt_free(pdma_cfg.ch);
+    rt_free_align(buf);
+    while (!(read32(base_addr + UART_LSR) & UART_LSR_TEMT));
 
-    uint32_t i;
-    volatile uint32_t *sed_buf;
-    volatile uint32_t *sta;
-    uint8_t *buf = (uint8_t *)buffer;
-    int length = size;
-
-    sed_buf = (uint32_t *)(base_addr + UART_THR);
-    sta = (uint32_t *)(base_addr + UART_USR);
-
-    while (size)
-    {
-        while (!(read32(base_addr + UART_LSR) & 0x20));
-        *sed_buf = *buf;
-        buf ++; size --;
-    }
-
-    return (length);
+    return size;
 }
 
-
-static rt_err_t  uart_control(rt_device_t dev, int cmd, void *args)
+static rt_err_t uart_control(rt_device_t dev, int cmd, void *args)
 {
     struct kd_uart_device *kd_uart_device = (struct kd_uart_device *)dev->user_data;
     volatile void *uart_base = kd_uart_device->base;
@@ -439,7 +408,7 @@ static rt_err_t  uart_control(rt_device_t dev, int cmd, void *args)
     value = (config->data_bits - 5) | (config->stop_bits << 2) | (config->parity << 3);
     write32(uart_base + UART_LCR, value & ~0x80);
 
-    write32(uart_base + UART_FCR, 0x01 | config->fifo_lenth << 6);
+    write32(uart_base + UART_FCR, 0x3f | config->fifo_lenth << 6);
 
     if (config->auto_flow)
         write32(uart_base + UART_MCR, (0x1 << 5 | 0x1 << 1));  //auto flow
@@ -450,13 +419,12 @@ static rt_err_t  uart_control(rt_device_t dev, int cmd, void *args)
     read32(uart_base + UART_RBR);
     read32(uart_base + UART_USR);
     read32(uart_base + UART_FCR);
-    write32(uart_base + UART_IER, 0x01);
+    write32(uart_base + UART_IER, 0x81);
 
     return RT_EOK;
 }
 
-const static struct rt_device_ops uart_ops =
-{
+const static struct rt_device_ops uart_ops = {
     RT_NULL,
     uart_open,
     uart_close,
@@ -469,8 +437,7 @@ static void uart_check_buffer_size(void)
 {
     static rt_bool_t already_output = RT_FALSE;
 
-    if (already_output == RT_FALSE)
-    {
+    if (already_output == RT_FALSE) {
         rt_kprintf("Warning: There is no enough buffer for saving data,"
               " please increase the CANAAN_UART_BUFFER_SIZE option.\n");
         already_output = RT_TRUE;
@@ -479,22 +446,19 @@ static void uart_check_buffer_size(void)
 
 static void uart_rx_fifo_get_char(struct rt_serial_rx_fifo *rx_fifo, uint8_t data)
 {
-    rt_base_t level;
-    level = rt_hw_interrupt_disable();
     rx_fifo->buffer[rx_fifo->put_index] = data;
     rx_fifo->put_index += 1;
 
-    if (rx_fifo->put_index >= CANAAN_UART_BUFFER_SIZE) rx_fifo->put_index = 0;
+    if (rx_fifo->put_index >= CANAAN_UART_BUFFER_SIZE)
+        rx_fifo->put_index = 0;
 
-    if (rx_fifo->put_index == rx_fifo->get_index)
-    {
+    if (rx_fifo->put_index == rx_fifo->get_index) {
         rx_fifo->get_index += 1;
         rx_fifo->is_full = RT_TRUE;
-        if (rx_fifo->get_index >= CANAAN_UART_BUFFER_SIZE) rx_fifo->get_index = 0;
-
+        if (rx_fifo->get_index >= CANAAN_UART_BUFFER_SIZE)
+            rx_fifo->get_index = 0;
         uart_check_buffer_size();
     }
-    rt_hw_interrupt_enable(level);
 }
 
 static void rt_hw_uart_isr(int irq, void *param)
@@ -510,47 +474,26 @@ static void rt_hw_uart_isr(int irq, void *param)
     iir = readb(base_addr + UART_IIR) & UART_IIR_IID_MASK;
     lsr = readb(base_addr + UART_LSR);
 
-    if (iir == UART_IIR_IID_BUSBSY)
-    {
-        (void)readb(base_addr + UART_USR);
+    if (lsr & (UART_LSR_RXFIFOE | UART_LSR_FE | UART_LSR_PE | UART_LSR_OE)) {
+        readb((void*)(base_addr + UART_RBR));
+        return;
     }
-    else if (lsr & (UART_LSR_DR | UART_LSR_BI))
-    {
+    if (iir == UART_IIR_IID_RXDVAL || iir == UART_IIR_IID_CHARTO) {
         uint8_t data;
+        rt_base_t level;
+        level = rt_hw_interrupt_disable();
         RT_ASSERT(kd_rx_fifo != RT_NULL);
         do {
             data = readb((void*)(base_addr + UART_RBR));
             uart_rx_fifo_get_char(kd_rx_fifo, data);
             lsr = readb((void*)(base_addr + UART_LSR));
         } while(lsr & UART_LSR_DR);
-
+        if (kd_uart_device->t_flag) {
+            kd_uart_device->t_flag = 0;
+            rt_wqueue_wakeup(&(uart->wait_queue), (void *)POLLIN);
+        }
+        rt_hw_interrupt_enable(level);
     }
-    else if (iir & UART_IIR_IID_CHARTO)
-    {
-        readb((void*)(base_addr + UART_RBR));
-    }
-
-    return;
-}
-
-static void uart_timeout(void* parameter)
-{
-    struct kd_uart_device *kd_uart_device = (struct kd_uart_device *)parameter;
-    rt_device_t uart = &kd_uart_device->kd_uart;
-    struct rt_serial_rx_fifo *kd_rx_fifo = kd_uart_device->kd_rx_fifo;
-    /* 检查是否有数据 */
-    uint32_t ret;
-
-    rt_interrupt_enter();
-
-    if ((kd_rx_fifo->put_index != kd_rx_fifo->get_index) && !kd_uart_device->t_flag)  /* 缓冲区有数据，且没有报超时 */
-    {
-        kd_uart_device->t_flag = 1;
-    
-        rt_wqueue_wakeup(&(uart->wait_queue), (void *)POLLIN);
-    }
-    rt_interrupt_leave();
-
 }
 
 int kd_hw_uart_init(void)
@@ -565,6 +508,7 @@ int kd_hw_uart_init(void)
     kd_uart_device->kd_uart.ops = &uart_ops;
     kd_uart_device->kd_uart.user_data = (void *)kd_uart_device;
     kd_uart_device->id = 1;
+    kd_uart_device->t_flag = 0;
     ret = rt_device_register(&kd_uart_device->kd_uart, "uart1", RT_DEVICE_FLAG_RDWR);
     kd_uart_device->kd_uart.fops = &_uart_fops;
 
@@ -582,9 +526,6 @@ int kd_hw_uart_init(void)
     rt_hw_interrupt_install(UART1_IRQ, rt_hw_uart_isr, kd_uart_device, "uart1");
     rt_hw_interrupt_umask(UART1_IRQ);
 
-    /* create timer */
-    rt_timer_init(&kd_uart_device->timer, "uart1_timer", uart_timeout, (void*)kd_uart_device, UART_TIMEOUT, RT_TIMER_FLAG_PERIODIC);
-
     rt_wqueue_init(&kd_uart_device->kd_uart.wait_queue);
 #ifndef RT_FASTBOOT
     rt_kprintf("k230 uart1 register OK.\n");
@@ -597,6 +538,7 @@ int kd_hw_uart_init(void)
     kd_uart_device->kd_uart.ops = &uart_ops;
     kd_uart_device->kd_uart.user_data = (void *)kd_uart_device;
     kd_uart_device->id = 2;
+    kd_uart_device->t_flag = 0;
     ret = rt_device_register(&kd_uart_device->kd_uart, "uart2", RT_DEVICE_FLAG_RDWR);
     kd_uart_device->kd_uart.fops = &_uart_fops;
 
@@ -614,9 +556,6 @@ int kd_hw_uart_init(void)
     rt_hw_interrupt_install(UART2_IRQ, rt_hw_uart_isr, kd_uart_device, "uart2");
     rt_hw_interrupt_umask(UART2_IRQ);
 
-    /* create timer */
-    rt_timer_init(&kd_uart_device->timer, "uart2_timer", uart_timeout, (void*)kd_uart_device, UART_TIMEOUT, RT_TIMER_FLAG_PERIODIC);
-
     rt_wqueue_init(&kd_uart_device->kd_uart.wait_queue);
 #ifndef RT_FASTBOOT
     rt_kprintf("k230 uart2 register OK.\n");
@@ -629,6 +568,7 @@ int kd_hw_uart_init(void)
     kd_uart_device->kd_uart.ops = &uart_ops;
     kd_uart_device->kd_uart.user_data = (void *)kd_uart_device;
     kd_uart_device->id = 3;
+    kd_uart_device->t_flag = 0;
     ret = rt_device_register(&kd_uart_device->kd_uart, "uart3", RT_DEVICE_FLAG_RDWR);
     kd_uart_device->kd_uart.fops = &_uart_fops;
 
@@ -646,9 +586,6 @@ int kd_hw_uart_init(void)
     rt_hw_interrupt_install(UART3_IRQ, rt_hw_uart_isr, kd_uart_device, "uart3");
     rt_hw_interrupt_umask(UART3_IRQ);
 
-    /* create timer */
-    rt_timer_init(&kd_uart_device->timer, "uart3_timer", uart_timeout, (void*)kd_uart_device, UART_TIMEOUT, RT_TIMER_FLAG_PERIODIC);
-
     rt_wqueue_init(&kd_uart_device->kd_uart.wait_queue);
 #ifndef RT_FASTBOOT
     rt_kprintf("k230 uart3 register OK.\n");
@@ -661,6 +598,7 @@ int kd_hw_uart_init(void)
     kd_uart_device->kd_uart.ops = &uart_ops;
     kd_uart_device->kd_uart.user_data = (void *)kd_uart_device;
     kd_uart_device->id = 4;
+    kd_uart_device->t_flag = 0;
     ret = rt_device_register(&kd_uart_device->kd_uart, "uart4", RT_DEVICE_FLAG_RDWR);
     kd_uart_device->kd_uart.fops = &_uart_fops;
 
@@ -677,9 +615,6 @@ int kd_hw_uart_init(void)
     /* register interrupt handler */
     rt_hw_interrupt_install(UART4_IRQ, rt_hw_uart_isr, kd_uart_device, "uart4");
     rt_hw_interrupt_umask(UART4_IRQ);
-
-    /* create timer */
-    rt_timer_init(&kd_uart_device->timer, "uart4_timer", uart_timeout, (void*)kd_uart_device, UART_TIMEOUT, RT_TIMER_FLAG_PERIODIC);
 
     rt_wqueue_init(&kd_uart_device->kd_uart.wait_queue);
 #ifndef RT_FASTBOOT

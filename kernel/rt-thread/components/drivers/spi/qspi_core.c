@@ -14,7 +14,7 @@ rt_err_t rt_qspi_configure(struct rt_qspi_device *device, struct rt_qspi_configu
 {
     RT_ASSERT(device != RT_NULL);
     RT_ASSERT(cfg != RT_NULL);
-
+    
     struct rt_qspi_device *qspi_device = (struct rt_qspi_device *)device;
     rt_err_t result = RT_EOK;
 
