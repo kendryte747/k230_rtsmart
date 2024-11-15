@@ -2,7 +2,7 @@
 
 #define DEV_FORMAT "ttyUSB%d"
 
-#define EC200M_MAX_TTY_INTF (3)
+#define EC200M_MAX_TTY_INTF (7)
 #define EC200M_FIFO_SIZE (512)
 #define ALIGN_SIZE (64)
 #define INTF_DISCONNECT (0xffff)
