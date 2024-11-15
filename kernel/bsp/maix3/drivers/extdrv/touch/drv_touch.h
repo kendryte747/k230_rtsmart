@@ -63,13 +63,15 @@ struct drv_touch_dev {
         struct rt_i2c_bus_device *bus;
         const char *name;
         const  uint32_t speed;
-        const  uint16_t addr;
+        uint16_t addr;
     } i2c;
 
     struct {
         struct rt_touch_device touch;
 
         void *priv;
+
+        char drv_name[16];
 
         int (*read_register)(struct drv_touch_dev *dev, struct touch_register *reg);
         int (*parse_register)(struct drv_touch_dev *dev, struct touch_register *reg, struct touch_point *result);
@@ -78,7 +80,7 @@ struct drv_touch_dev {
         int (*get_default_rotate)(struct drv_touch_dev *dev);
     } dev;
 
-    const struct {
+    struct {
         int range_x;
         int range_y;
         int point_num;
@@ -113,5 +115,8 @@ int touch_dev_read_reg(struct drv_touch_dev *dev, rt_uint8_t addr,
  */
 void touch_dev_update_event(int finger_num, struct rt_touch_data *point);
 
-int drv_touch_init_ft5x16(struct drv_touch_dev *dev);
-int drv_touch_init_cst128(struct drv_touch_dev *dev);
+typedef int (*drv_touch_probe)(struct drv_touch_dev *);
+
+int drv_touch_probe_ft5x16(struct drv_touch_dev *dev);
+int drv_touch_probe_cst128(struct drv_touch_dev *dev);
+int drv_touch_probe_chsc5xxx(struct drv_touch_dev *dev);

@@ -23,6 +23,21 @@
 #include "riscv.h"
 #include "stack.h"
 #include "sysctl_boot.h"
+#include "rtconfig.h"
+
+#define MEMORY_RESERVED     (0x1000)
+
+#define RTT_SYS_BASE        (CONFIG_MEM_RTSMART_BASE + CONFIG_RTSMART_OPENSIB_MEMORY_SIZE)
+#define RTT_SYS_SIZE        ((((CONFIG_MEM_RTSMART_SIZE - CONFIG_RTSMART_OPENSIB_MEMORY_SIZE) / 1024) - 1) * 1024)
+
+#define RAM_END             (RTT_SYS_BASE + RTT_SYS_SIZE - 4096)
+#define RT_HEAP_SIZE        (CONFIG_MEM_RTSMART_HEAP_SIZE)
+
+#define RT_HW_HEAP_BEGIN    ((void *)&__bss_end)
+#define RT_HW_HEAP_END      ((void *)(((rt_size_t)RT_HW_HEAP_BEGIN) + RT_HEAP_SIZE ))
+
+#define RT_HW_PAGE_START    ((void *)((rt_size_t)RT_HW_HEAP_END + sizeof(rt_size_t)))
+#define RT_HW_PAGE_END      ((void *)(RAM_END))
 
 #ifdef RT_USING_USERSPACE
     #include "riscv_mmu.h"
@@ -32,15 +47,178 @@
     #include "ioremap.h"
 
     //这个结构体描述了buddy system的页分配范围
-    rt_region_t init_page_region =
-    {
-        (rt_size_t)RT_HW_PAGE_START,
-        (rt_size_t)RT_HW_PAGE_END
-    };
-
+    rt_region_t init_page_region;
     //内核页表
     volatile rt_size_t MMUTable[__SIZE(VPN2_BIT)] __attribute__((aligned(4 * 1024)));
     rt_mmu_info mmu_info;
+#endif
+
+#ifdef CONFIG_AUTO_DETECT_DDR_SIZE
+struct k230_ddr_size_tag_st{
+  uint32_t flage;
+  uint32_t shash;
+  uint32_t resver;
+  uint32_t ddr_size;
+};
+
+static uint32_t shash_len(const char *s,int len) {
+  uint32_t v = 5381;
+  int i = 0;
+
+  for(i= 0; i < len; i++){
+    v = (v << 5) + v + s[i];
+  }
+  return v;
+}
+
+rt_size_t get_ddr_phy_size(void)
+{
+    static unsigned int g_ddr_size = 0;
+
+    struct k230_ddr_size_tag_st ddr_tag;
+    int shash = 0;
+
+    if(g_ddr_size == 0){
+        memcpy(&ddr_tag, RTT_SYS_BASE - sizeof(ddr_tag), sizeof(ddr_tag));
+        shash = ddr_tag.shash;
+        ddr_tag.shash = 0;
+
+        if(ddr_tag.flage == 0x5a5a5a5a && shash == shash_len((unsigned char *)&ddr_tag, sizeof(ddr_tag))){
+            g_ddr_size = ddr_tag.ddr_size;
+            //rt_kprintf("ddr size ok %x\n", g_ddr_size);
+        }else {
+            g_ddr_size = 0x20000000;
+            //rt_kprintf("ddr size errror %x %x %x %x \n", g_ddr_size, ddr_tag.flage, shash,ddr_tag.ddr_size);
+        }
+    }
+
+    return g_ddr_size;
+}
+
+rt_size_t  get_rtsmart_heap_size(void)
+{
+    rt_size_t ret = 0x2000000;
+    switch (get_ddr_phy_size())
+    {
+        #ifdef CONFIG_MEM_RTSMART_HEAP_SIZE_512
+        case 0x20000000:
+            ret =  CONFIG_MEM_RTSMART_HEAP_SIZE_512;
+            break;
+        #endif
+        #ifdef CONFIG_MEM_RTSMART_HEAP_SIZE_1024
+        case 0x40000000:
+            ret =  CONFIG_MEM_RTSMART_HEAP_SIZE_1024;
+            break;
+        #endif
+        #ifdef CONFIG_MEM_RTSMART_HEAP_SIZE_2048
+        case 0x80000000:
+            ret =  CONFIG_MEM_RTSMART_HEAP_SIZE_2048;
+            break;
+        #endif
+        default:
+            break;
+    }
+    return ret;
+}
+
+rt_size_t get_rtsmart_sys_size(void)
+{
+    rt_size_t ret = 0x10000000;
+    switch (get_ddr_phy_size())
+    {
+        #ifdef CONFIG_MEM_RTSMART_SIZE_512
+        case 0x20000000:
+            ret =  CONFIG_MEM_RTSMART_SIZE_512;
+            break;
+        #endif
+        #ifdef CONFIG_MEM_RTSMART_SIZE_1024
+        case 0x40000000:
+            ret =  CONFIG_MEM_RTSMART_SIZE_1024;
+            break;
+        #endif
+        #ifdef CONFIG_MEM_RTSMART_SIZE_2048
+        case 0x80000000:
+            ret =  CONFIG_MEM_RTSMART_SIZE_2048;
+            break;
+        #endif
+        default:
+            break;
+    }
+    return ret;
+}
+
+rt_size_t get_mem_mmz_base(void)
+{
+    rt_size_t ret = 0x10000000;
+    switch (get_ddr_phy_size())
+    {
+        #ifdef CONFIG_MEM_MMZ_BASE_512
+        case 0x20000000:
+            ret = CONFIG_MEM_MMZ_BASE_512;
+            break;
+        #endif
+        #ifdef CONFIG_MEM_MMZ_BASE_1024
+        case 0x40000000:
+            ret = CONFIG_MEM_MMZ_BASE_1024;
+            break;
+        #endif
+        #ifdef CONFIG_MEM_MMZ_BASE_2048
+        case 0x80000000:
+            ret = CONFIG_MEM_MMZ_BASE_2048;
+            break;
+        #endif
+        default:
+            break;
+    }
+    return ret;
+}
+
+rt_size_t get_mem_mmz_size(void)
+{
+    rt_size_t ret = 0x10000000;
+    switch (get_ddr_phy_size())
+    {
+        #ifdef CONFIG_MEM_MMZ_SIZE_512
+        case 0x20000000:
+            ret =  CONFIG_MEM_MMZ_SIZE_512;
+            break;
+        #endif
+
+        #ifdef CONFIG_MEM_MMZ_SIZE_1024
+        case 0x40000000:
+            ret =  CONFIG_MEM_MMZ_SIZE_1024;
+            break;
+        #endif
+        #ifdef CONFIG_MEM_MMZ_SIZE_2048
+        case 0x80000000:
+            ret =  CONFIG_MEM_MMZ_SIZE_2048;
+            break;
+        #endif
+        default:
+            break;
+    }
+    return ret;
+}
+#else
+rt_size_t get_ddr_phy_size(void) {
+    return CONFIG_MEM_TOTAL_SIZE;
+}
+
+rt_size_t get_rtsmart_heap_size(void) {
+    return CONFIG_MEM_RTSMART_HEAP_SIZE;
+}
+
+rt_size_t get_rtsmart_sys_size(void) {
+    return CONFIG_MEM_RTSMART_SIZE;
+}
+
+rt_size_t get_mem_mmz_base(void) {
+    return CONFIG_MEM_MMZ_BASE;
+}
+
+rt_size_t get_mem_mmz_size(void) {
+    return CONFIG_MEM_MMZ_SIZE;
+}
 #endif
 
 //初始化BSS节区
@@ -101,14 +279,19 @@ void primary_cpu_entry(void)
 
 #define IOREMAP_SIZE (1ul << 30)
 
+
 //这个初始化程序由内核主动调用，此时调度器还未启动，因此在此不能使用依赖线程上下文的函数
 void rt_hw_board_init(void)
 {
+
 #ifdef RT_USING_USERSPACE
     // rt_hw_mmu_map_init actually allocate a region for ioremap,
     // set (0xC000-0000 to 0xFFFF-FFFF) as IOREMAP(or kernel virt addr allocation) region
     // any peripherals in this region should be accessed after ioremap
     rt_hw_mmu_map_init(&mmu_info, (void *)(0x100000000UL - IOREMAP_SIZE), IOREMAP_SIZE, (rt_size_t *)MMUTable, 0);
+    init_page_region.start = (rt_size_t)RT_HW_PAGE_START;
+    init_page_region.end = (rt_size_t)RT_HW_PAGE_END;
+    //rt_kprintf("s=%lx %lx \n",init_page_region.start, init_page_region.end);
     rt_page_init(init_page_region);
     rt_hw_mmu_kernel_map_init(&mmu_info, 0x00000000UL, (0x100000000UL - IOREMAP_SIZE));
 
@@ -129,7 +312,8 @@ void rt_hw_board_init(void)
 // #if  MEM_IPCM_SIZE >  MEM_RESVERD_SIZE
 //     init_ipcm_mem();
 //     /* initalize interrupt */
-// #endif 
+// #endif
+
 
     rt_hw_interrupt_init();
 

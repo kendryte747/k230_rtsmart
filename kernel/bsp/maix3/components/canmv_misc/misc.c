@@ -1,8 +1,15 @@
-#include "lwp_user_mm.h"
-#include <dfs_file.h>
-#include <rtthread.h>
+#include <stdio.h>
+#include <stdint.h>
 #include <string.h>
+
+#include <sys/types.h>
 #include <time.h>
+
+#include <rtthread.h>
+#include <dfs_file.h>
+#include <lwp_user_mm.h>
+
+#include "board.h"
 
 #ifdef RT_USING_LWP
 #include <lwp.h>
@@ -122,6 +129,9 @@ static int misc_close(struct dfs_fd *file) { return 0; }
 #define MISC_DEV_CMD_NTP_SYNC           (0x1024 + 3)
 #define MISC_DEV_CMD_GET_TIME_T         (0x1024 + 4)
 #define MISC_DEV_CMD_GET_CPU_TICK       (0x1024 + 5)
+#define MISC_DEV_CMD_GET_MEMORY_SIZE    (0x1024 + 6)
+#define MISC_DEV_CMD_CREATE_SOFT_I2C    (0x1024 + 7)
+#define MISC_DEV_CMD_DELETE_SOFT_I2C    (0x1024 + 8)
 
 struct meminfo_t {
   size_t total_size;
@@ -283,6 +293,63 @@ static int misc_get_cpu_tick(void *args) {
   return 0;
 }
 
+static int misc_get_memory_size(void *args) {
+  uint64_t size = get_ddr_phy_size();
+
+  if (sizeof(uint64_t) != lwp_put_to_user(args, &size, sizeof(uint64_t))) {
+    rt_kprintf("%s put_to_user failed\n", __func__);
+    return -1;
+  }
+
+  return 0;
+}
+
+static int misc_create_soft_i2c_device(void *args) {
+#if defined (RT_USING_SOFT_I2C)
+  struct soft_i2c_configure {
+    uint32_t bus_num;
+    uint32_t pin_scl;
+    uint32_t pin_sda;
+    uint32_t freq;
+    uint32_t timeout_ms;
+  };
+
+  struct soft_i2c_configure cfg = {0};
+
+  if(sizeof(cfg) != lwp_get_from_user(&cfg, args, sizeof(cfg))) {
+    rt_kprintf("%s get_frome_user failed\n", __func__);
+    return -1;
+  }
+
+  uint32_t timeout_tick = rt_tick_from_millisecond(cfg.timeout_ms);
+
+  extern int rt_soft_i2c_add_dev(int bus_num, int scl, int sda, uint32_t freq, uint32_t timeout);
+  return rt_soft_i2c_add_dev(cfg.bus_num, cfg.pin_scl, cfg.pin_sda, cfg.freq, timeout_tick);
+#else
+  rt_kprintf("please enable soft i2c\n");
+
+  return -1;
+#endif // RT_USING_SOFT_I2C
+}
+
+static int misc_delete_soft_i2c_device(void *args) {
+#if defined (RT_USING_SOFT_I2C)
+  uint32_t bus_num = 0;
+
+  if(sizeof(bus_num) != lwp_get_from_user(&bus_num, args, sizeof(bus_num))) {
+    rt_kprintf("%s get_frome_user failed\n", __func__);
+    return -1;
+  }
+
+  extern int rt_soft_i2c_del_dev(int bus_num);
+  return rt_soft_i2c_del_dev(bus_num);
+#else
+  rt_kprintf("please enable soft i2c\n");
+
+  return -1;
+#endif // RT_USING_SOFT_I2C
+}
+
 static const struct misc_dev_handle misc_handles[] = {
   {
     .cmd = MISC_DEV_CMD_READ_HEAP,
@@ -308,6 +375,18 @@ static const struct misc_dev_handle misc_handles[] = {
     .cmd = MISC_DEV_CMD_GET_CPU_TICK,
     .func = misc_get_cpu_tick,
   },
+  {
+    .cmd = MISC_DEV_CMD_GET_MEMORY_SIZE,
+    .func = misc_get_memory_size,
+  },
+  {
+    .cmd = MISC_DEV_CMD_CREATE_SOFT_I2C,
+    .func = misc_create_soft_i2c_device,
+  },
+  {
+    .cmd = MISC_DEV_CMD_DELETE_SOFT_I2C,
+    .func = misc_delete_soft_i2c_device,
+  }
 };
 
 static int misc_ioctl(struct dfs_fd *file, int cmd, void *args) {

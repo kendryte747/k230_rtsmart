@@ -25,16 +25,15 @@ if GetDepend(['CHERRY_USB_OSAL_RTTHREAD']):
     path += [cwd + '/osal']
     src += Glob('osal/usb_osal_rtthread.c')
 
+if GetDepend(['CHERRY_USB_SPEED_HS']):
+    CPPDEFINES+=['CONFIG_USB_HS']
+
 # USB DEVICE
 if GetDepend(['ENABLE_CHERRY_USB_DEVICE']):
     src += Glob('core/usbd_core.c')
 
-    if GetDepend(['CHERRY_USB_DEVICE_SPEED_HS']):
-        CPPDEFINES+=['CONFIG_USB_HS']
-
     if GetDepend(['CHERRYUSB_DEVICE_DWC2_K230']):
         src += Glob('port/dwc2/usb_dc_dwc2.c')
-        src += Glob('port/dwc2/usb_glue_kendryte.c')
 
     if GetDepend(['CHERRY_USB_DEVICE_ENABLE_CLASS_CDC_ACM']):
         src += Glob('class/cdc/usbd_cdc.c')
@@ -78,6 +77,9 @@ if GetDepend(['ENABLE_CHERRY_USB_HOST']):
 
     if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_CDC_ECM']):
         src += Glob('class/cdc/usbh_cdc_ecm.c')
+
+if GetDepend(['CHERRYUSB_HOST_DWC2_K230']) or GetDepend(['CHERRYUSB_DEVICE_DWC2_K230']):
+    src += Glob('port/dwc2/usb_glue_kendryte.c')
 
 group = DefineGroup('CherryUSB', src, depend = ['ENABLE_CHERRY_USB'], CPPPATH = path, CPPDEFINES = CPPDEFINES)
 

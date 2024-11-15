@@ -42,12 +42,14 @@
 #endif
 
 /*!< config descriptor size */
-#if defined (CHERRY_USB_DEVICE_ENABLE_CLASS_CDC_ACM) && defined (CHERRY_USB_DEVICE_ENABLE_CLASS_MTP)
-    #define USB_CONFIG_SIZE (9 + CDC_ACM_DESCRIPTOR_LEN + MTP_DESCRIPTOR_LEN)
-#elif defined (CHERRY_USB_DEVICE_ENABLE_CLASS_CDC_ACM)
-    #define USB_CONFIG_SIZE (9 + CDC_ACM_DESCRIPTOR_LEN)
-#else
-#error "Must enable CDC or CDC and MTP"
+#if defined (ENABLE_CANMV_USB_DEV)
+    #if defined (CHERRY_USB_DEVICE_ENABLE_CLASS_CDC_ACM) && defined (CHERRY_USB_DEVICE_ENABLE_CLASS_MTP)
+        #define USB_CONFIG_SIZE (9 + CDC_ACM_DESCRIPTOR_LEN + MTP_DESCRIPTOR_LEN)
+    #elif defined (CHERRY_USB_DEVICE_ENABLE_CLASS_CDC_ACM)
+        #define USB_CONFIG_SIZE (9 + CDC_ACM_DESCRIPTOR_LEN)
+    #else
+    #error "Must enable CDC or CDC and MTP"
+    #endif
 #endif
 
 extern bool g_fs_mount_data_succ;

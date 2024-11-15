@@ -137,7 +137,10 @@ static void check_bank_voltage(void)
   volatile rt_uint32_t read_result = *((rt_uint32_t *) virt_addr);
 
   if(0x00 == read_result) {
+#if !defined (CONFIG_BOARD_K230_CANMV) && !defined (CONFIG_BOARD_K230_CANMV_DONGSHANPI)
     rt_kprintf("\n\n\033[31mTHIS BOARD MAYBE NOT CONFIGURE BANK VOLTAGE!!!\n\n\033[0m");
+#endif
+
 #ifdef CONFIG_BOARD_K230_CANMV_LCKFB
     kd_pin_mode(62, GPIO_DM_OUTPUT);
     kd_pin_write(62, GPIO_PV_LOW);
@@ -149,15 +152,14 @@ static void check_bank_voltage(void)
 
 int main(void) {
   check_bank_voltage();
+
   rt_kprintf("\n#############SDK VERSION######################################\n");
   rt_kprintf("SDK   : %s\n", SDK_VERSION_);
-  rt_kprintf("nncase: %s\n", NNCASE_VERSION_);
 #ifdef CONFIG_SDK_ENABLE_CANMV
   rt_kprintf("CanMV : %s\n", CANMV_VERSION_);
 #endif //CONFIG_SDK_ENABLE_CANMV
+  rt_kprintf("nncase: %s\n", NNCASE_VERSION_);
   rt_kprintf("##############################################################\n");
-
-
 
 #ifdef RT_USING_SDIO
   while (mmcsd_wait_cd_changed(100) != MMCSD_HOST_PLUGED) {

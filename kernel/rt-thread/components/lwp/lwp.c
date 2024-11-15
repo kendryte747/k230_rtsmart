@@ -25,6 +25,7 @@
 #include "lwp_arch.h"
 #include "lwp_arch_comm.h"
 #include "console.h"
+#include "board.h"
 
 #define DBG_TAG "LWP"
 #define DBG_LVL DBG_WARNING

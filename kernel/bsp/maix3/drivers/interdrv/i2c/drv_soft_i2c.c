@@ -39,6 +39,7 @@ struct st_iomux_reg_t {
 struct soft_i2c_priv_t {
     int index;
     uint32_t freq;
+    uint32_t timeout;
 
     int sda_mode, scl_mode; // 0: input, 1: output, default set to -1
     int sda_pin, scl_pin;
@@ -174,29 +175,53 @@ static rt_int32_t soft_i2c_get_scl(void *data) {
 
 static uint32_t soft_i2c_freq_to_delay(uint32_t freq)
 {
-    //TODO
-    LOG_W("TODO");
+    if (freq == 0) {
+        return 0;
+    }
 
-    return 5;
+    uint32_t delay_us = (1000000U + freq - 1) / freq / 2;
+
+    return delay_us;
 }
 
 static rt_slist_t _kd_soft_i2c_dev_list = RT_SLIST_OBJECT_INIT(_kd_soft_i2c_dev_list);
 
 int rt_soft_i2c_del_dev(int bus_num)
 {
+    int result = 0;
+    char dev_name[32];
+    rt_device_t dev = RT_NULL;
     rt_slist_t *node = RT_NULL;
     struct soft_i2c_priv_t *priv = NULL;
+
+    if(4 >= bus_num) {
+        LOG_E("don't support remove i2c%d \n", bus_num);
+        return -2;
+    }
+
+    rt_kprintf("Delete soft i2c bus %d\n", bus_num);
 
     rt_slist_for_each(node, &_kd_soft_i2c_dev_list) {
         priv = rt_slist_entry(node, struct soft_i2c_priv_t, list);
 
         if(priv->index == bus_num) {
+            snprintf(dev_name, sizeof(dev_name), "i2c%d", bus_num);
+
             if(RT_EOK != rt_mutex_take(&priv->mutex, rt_tick_from_millisecond(10))) {
                 LOG_E("take mutex failed");
-                return -1;
+                return -2;
             }
 
-            rt_device_unregister((rt_device_t)&priv->dev);
+            if(NULL == (dev = rt_device_find(dev_name))) {
+                result = -2;
+
+                rt_kprintf("can't find /dev/%s", dev_name);
+            } else {
+                result = 0;
+
+                rt_mutex_detach(&priv->dev.lock);
+                rt_device_unregister(dev);
+            }
 
             rt_mutex_release(&priv->mutex);
 
@@ -206,26 +231,31 @@ int rt_soft_i2c_del_dev(int bus_num)
 
             rt_free(priv);
 
-            return 0;
+            return result;
         }
     }
 
     return -1;
 }
 
-int rt_soft_i2c_add_dev(int bus_num, int scl, int sda, uint32_t freq)
+int rt_soft_i2c_add_dev(int bus_num, int scl, int sda, uint32_t freq, uint32_t timeout)
 {
     rt_slist_t *node = RT_NULL;
     struct soft_i2c_priv_t *priv = NULL;
 
     char name[RT_NAME_MAX];
 
+    if(4 >= bus_num) {
+        LOG_E("don't support add i2c%d\n", bus_num);
+        return -2;
+    }
+
     rt_slist_for_each(node, &_kd_soft_i2c_dev_list) {
         priv = rt_slist_entry(node, struct soft_i2c_priv_t, list);
 
         if(priv->index == bus_num) {
-            if((priv->scl_pin != scl) || (priv->sda_pin != sda) || (priv->freq != freq)) {
-                LOG_I("change soft_i2c%d configure.", bus_num);
+            if((priv->scl_pin != scl) || (priv->sda_pin != sda) || (priv->freq != freq) || (priv->timeout != timeout)) {
+                LOG_I("update soft_i2c%d configure.", bus_num);
 
                 if(RT_EOK != rt_mutex_take(&priv->mutex, rt_tick_from_millisecond(10))) {
                     LOG_E("take mutex failed");
@@ -235,10 +265,14 @@ int rt_soft_i2c_add_dev(int bus_num, int scl, int sda, uint32_t freq)
                 priv->scl_pin = scl;
                 priv->sda_pin = sda;
                 priv->freq = freq;
+                priv->timeout = timeout;
 
+                priv->dev_ops.timeout = timeout;
                 priv->dev_ops.delay_us = soft_i2c_freq_to_delay(freq);
 
                 rt_mutex_release(&priv->mutex);
+
+                rt_kprintf("Update soft i2c bus %d, scl %d, sda %d, freq %u, timeout %u, delay %d\n", bus_num, scl, sda, freq, timeout, priv->dev_ops.delay_us);
             }
 
             return 0;
@@ -254,9 +288,11 @@ int rt_soft_i2c_add_dev(int bus_num, int scl, int sda, uint32_t freq)
         fpioa_reg = (uint32_t *)rt_ioremap((void *)0X91105000, 0x00001000UL);
     }
 
+    priv->index = bus_num;
     priv->scl_pin = scl;
     priv->sda_pin = sda;
     priv->freq = freq;
+    priv->timeout = timeout;
 
     config_pin_use_as_soft_i2c(scl);
     config_pin_use_as_soft_i2c(sda);
@@ -272,7 +308,7 @@ int rt_soft_i2c_add_dev(int bus_num, int scl, int sda, uint32_t freq)
 
     priv->dev_ops.udelay = soft_i2c_udelay,
 
-    priv->dev_ops.timeout = 1000;
+    priv->dev_ops.timeout = timeout;
     priv->dev_ops.delay_us = soft_i2c_freq_to_delay(freq);
 
     priv->dev_ops.data = priv;
@@ -298,6 +334,8 @@ int rt_soft_i2c_add_dev(int bus_num, int scl, int sda, uint32_t freq)
 
     rt_slist_init(&priv->list);
     rt_slist_insert(&_kd_soft_i2c_dev_list, &priv->list);
+
+    rt_kprintf("Add new soft i2c bus %d, scl %d, sda %d, freq %u, timeout %u, delay %d\n", bus_num, scl, sda, freq, timeout, priv->dev_ops.delay_us);
 
     return 0;
 }

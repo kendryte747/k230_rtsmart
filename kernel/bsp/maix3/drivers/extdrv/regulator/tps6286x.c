@@ -220,4 +220,4 @@ int regulator_tps6286x_init(void)
 
     return ret;
 }
-INIT_DEVICE_EXPORT(regulator_tps6286x_init);
+INIT_COMPONENT_EXPORT(regulator_tps6286x_init);

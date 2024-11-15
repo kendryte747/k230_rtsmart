@@ -12,6 +12,7 @@
 #ifndef __SPI_H__
 #define __SPI_H__
 
+#include "rtdef.h"
 #include <stdlib.h>
 #include <rtthread.h>
 
@@ -55,6 +56,9 @@ extern "C"{
 #define RT_SPI_BUS_MODE_SPI         (1<<0)
 #define RT_SPI_BUS_MODE_QSPI        (1<<1)
 
+#define RT_SPI_DEV_CTRL_CONFIG  (RT_DEVICE_CTRL_BASE(SPIBUS) + 0x01)
+#define RT_SPI_DEV_CTRL_RW      (RT_DEVICE_CTRL_BASE(SPIBUS) + 0x02)
+
 /**
  * SPI message structure
  */
@@ -76,7 +80,14 @@ struct rt_spi_configuration
 {
     rt_uint8_t mode;
     rt_uint8_t data_width;
-    rt_uint16_t reserved;
+
+    union {
+        struct {
+            rt_uint16_t hard_cs : 8; // hard spi cs
+            rt_uint16_t soft_cs : 8; // 0x80 | pin
+        };
+        rt_uint16_t reserved;
+    };
 
     rt_uint32_t max_hz;
 };
@@ -120,7 +131,8 @@ struct rt_qspi_message
     /* instruction stage */
     struct
     {
-        rt_uint8_t content;
+        rt_uint32_t content;
+        rt_uint8_t size;
         rt_uint8_t qspi_lines;
     } instruction;
 
@@ -147,7 +159,7 @@ struct rt_qspi_configuration
     /* double data rate mode */
     rt_uint8_t ddr_mode;
     /* the data lines max width which QSPI bus supported, such as 1, 2, 4 */
-    rt_uint8_t qspi_dl_width ;
+    rt_uint8_t qspi_dl_width;
 };
 
 struct rt_qspi_device
