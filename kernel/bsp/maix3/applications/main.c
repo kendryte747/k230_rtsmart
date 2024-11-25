@@ -195,12 +195,15 @@ int main(void) {
 
 #endif // ENABLE_CHERRY_USB_DEVICE
 
-  rt_thread_delay(10);
 #endif //ENABLE_CHERRY_USB
 
-#ifdef CONFIG_SDK_ENABLE_CANMV
-  msh_exec("/sdcard/micropython", 32);
-#endif //CONFIG_SDK_ENABLE_CANMV
+  {
+    size_t cmd_length = rt_strlen(CONFIG_RTT_AUTO_EXEC_CMD);
+
+    if(cmd_length) {
+      msh_exec(CONFIG_RTT_AUTO_EXEC_CMD, 32);
+    }
+  }
 
   return 0;
 }
