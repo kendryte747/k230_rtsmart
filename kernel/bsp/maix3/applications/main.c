@@ -58,9 +58,15 @@
 #define SD_DEV_PART(s, d, p) CONCAT(s, TO_STRING(d), p)
 
 static const struct dfs_mount_tbl custom_mount_table[] = {
+#if defined (SDCARD_ON_SDIO_DEV0) && defined (RT_SDIO0_EMMC)
+  {"emmc0", "/bin", "elm", 0, 0},
+  {"emmc1", "/sdcard", "elm", 0, 0},
+  {"emmc2", "/data", "elm", 0, 0},
+#else
   {SD_DEV_PART("sd", SDCARD_ON_SDIO_DEV, "0"), "/bin", "elm", 0, 0},
   {SD_DEV_PART("sd", SDCARD_ON_SDIO_DEV, "1"), "/sdcard", "elm", 0, 0},
   {SD_DEV_PART("sd", SDCARD_ON_SDIO_DEV, "2"), "/data", "elm", 0, 0},
+#endif
   {0}
 };
 
