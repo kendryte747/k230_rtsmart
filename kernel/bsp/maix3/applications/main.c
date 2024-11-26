@@ -201,7 +201,7 @@ int main(void) {
     size_t cmd_length = rt_strlen(CONFIG_RTT_AUTO_EXEC_CMD);
 
     if(cmd_length) {
-      msh_exec(CONFIG_RTT_AUTO_EXEC_CMD, 32);
+      msh_exec(CONFIG_RTT_AUTO_EXEC_CMD, cmd_length);
     }
   }
 
