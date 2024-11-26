@@ -99,7 +99,7 @@ static int parse_register(struct drv_touch_dev *dev, struct touch_register *reg,
     }
 
     for (result_index = 0; result_index < TOUCH_CHSC5XXX_MAX_POINTS; result_index++) {
-        if (chsc5xxx_reg->pos[result_index].id != 0xFF) {
+        if (chsc5xxx_reg->pos[result_index].id < TOUCH_CHSC5XXX_MAX_POINTS) {
             finger_num++;
         }
     }
