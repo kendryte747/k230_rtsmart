@@ -25,13 +25,12 @@ comment "Application Configure Start"
 
 config USER_APP_DIR
     string "User Applications Directory"
-    default "applications"
+    default "app_canmv"
 
 source "$USER_APP_DIR/Kconfig"
 
 comment "K230 Custom Configure Start"
 
-source "applications/Kconfig"
 source "board/Kconfig"
 source "drivers/Kconfig"
 source "components/Kconfig"
