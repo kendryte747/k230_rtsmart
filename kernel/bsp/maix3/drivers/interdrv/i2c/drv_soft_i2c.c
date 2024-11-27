@@ -9,32 +9,12 @@
 #include "tick.h"
 
 #include "drv_gpio.h"
+#include "drv_fpioa.h"
 
 #define DBG_TAG          "soft_i2c"
 #define DBG_LVL          DBG_WARNING
 #define DBG_COLOR
 #include <rtdbg.h>
-
-static volatile uint32_t *fpioa_reg = NULL;
-
-struct st_iomux_reg_t {
-    union {
-        struct {
-            uint32_t st : 1;                // bit 0    输入施密特触发器控制使能
-            uint32_t ds : 4;                // bit 1-4  驱动电流控制
-            uint32_t pd : 1;                // bit 5    下拉使能
-            uint32_t pu : 1;                // bit 6    上拉使能
-            uint32_t oe : 1;                // bit 7    输出使能
-            uint32_t ie : 1;                // bit 8    输入使能
-            uint32_t msc : 1;               // bit 9    电压选择
-            uint32_t rsv_bit10 : 1;         // bit 10
-            uint32_t io_sel : 3;            // bit 11-13 复用功能选择
-            uint32_t rsv_bit14_30 : 17;     // bit 14-30
-            uint32_t di : 1;                // bit 31   当前PAD输入到芯片内部的数据(即PAD的C端)
-        } bit;
-        uint32_t value;
-    } u;
-};
 
 struct soft_i2c_priv_t {
     int index;
@@ -50,14 +30,6 @@ struct soft_i2c_priv_t {
     struct rt_mutex mutex;
     rt_slist_t list;
 };
-
-static uint32_t fpioa_get_pin_cfg(int pin) {
-   return *(fpioa_reg + pin);
-}
-
-static void fpioa_set_pin_cfg(int pin, uint32_t cfg) {
-    *(fpioa_reg + pin) = (*(fpioa_reg + pin) & 0x200) | cfg;
-}
 
 static void config_pin_use_as_soft_i2c(int pin) {
     struct st_iomux_reg_t reg;
@@ -282,10 +254,6 @@ int rt_soft_i2c_add_dev(int bus_num, int scl, int sda, uint32_t freq, uint32_t t
     if(NULL == (priv = rt_malloc(sizeof(*priv)))) {
         LOG_E("malloc failed.");
         return -2;
-    }
-
-    if(NULL == fpioa_reg) {
-        fpioa_reg = (uint32_t *)rt_ioremap((void *)0X91105000, 0x00001000UL);
     }
 
     priv->index = bus_num;
