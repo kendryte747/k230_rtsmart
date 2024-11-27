@@ -10,17 +10,19 @@ config RTT_DIR
     option env="RTT_ROOT"
     default "../../rt-thread"
 
-#config PKGS_DIR
-#    string
-#    option env="PKGS_ROOT"
-#    default "packages"
+config PKGS_DIR
+   string
+   option env="PKGS_ROOT"
+   default "packages"
 
 source "$RTT_DIR/Kconfig"
 
-# We do not use online packages
-#source "$PKGS_DIR/Kconfig"
+# we disable use online packages
+# comment "Be Careful use RT-Smart Online Packages"
+# source "$PKGS_DIR/Kconfig"
 
-# Canmv Spec
+comment "K230 sdk custom config start"
+
 source "applications/Kconfig"
 source "board/Kconfig"
 source "drivers/Kconfig"

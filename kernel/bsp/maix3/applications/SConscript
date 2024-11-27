@@ -9,9 +9,13 @@ src	+= Glob('mnt.c')
 if GetDepend(['RT_USING_SDIO']):
     src	+= Glob('config.c')
 
-if GetDepend(['RT_WLAN_MANAGE_ENABLE']):
-    src	+= Glob('wlan_mgmt_dev.c')
-
 group = DefineGroup('Applications', src, depend = [''], CPPPATH = CPPPATH)
 
-Return('group')
+objs = [group]
+list = os.listdir(cwd)
+
+for item in list:
+    if os.path.isfile(os.path.join(cwd, item, 'SConscript')):
+        objs = objs + SConscript(os.path.join(item, 'SConscript'))
+
+Return('objs')
