@@ -385,7 +385,16 @@ CONFIG_RT_LWP_SHM_MAX_NR=64
 # CONFIG_LWP_UNIX98_PTY is not set
 
 #
-# Applications Configuration
+# Application Configure Start
+#
+CONFIG_USER_APP_DIR="app_canmv"
+
+#
+# Applications CanMV Configuration
+#
+
+#
+# K230 Custom Configure Start
 #
 
 #
