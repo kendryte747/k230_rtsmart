@@ -5,6 +5,6 @@ CPPPATH = [cwd]
 
 src	= Glob('*.c')
 
-group = DefineGroup('UserApplications', src, depend = [''], CPPPATH = CPPPATH)
+group = DefineGroup('UserApplications', src, depend = ['RTT_ENABLE_USER_APP'], CPPPATH = CPPPATH)
 
 Return('group')
