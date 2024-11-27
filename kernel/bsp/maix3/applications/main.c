@@ -189,7 +189,7 @@ int main(void) {
 #if defined (ENABLE_CHERRY_USB_DEVICE) && defined (ENABLE_CANMV_USB_DEV)
   usb_base = (void *)rt_ioremap((void *)usb_dev_addr[CHERRY_USB_DEVICE_USING_DEV], 0x10000);
 
-  canmv_usb_device_init(usb_base);
+  board_usb_device_init(usb_base);
 
 #ifdef CANMV_USB_PWR_PIN
   int usb_host_pin = CANMV_USB_PWR_PIN;

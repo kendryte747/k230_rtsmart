@@ -92,7 +92,7 @@ static void event_handler(uint8_t busid, uint8_t event)
 }
 
 /*****************************************************************************/
-void canmv_usb_device_init(void *usb_base)
+void board_usb_device_init(void *usb_base)
 {
     usbd_desc_register(USB_DEVICE_BUS_ID, canmv_usb_descriptor);
 

@@ -60,4 +60,4 @@ extern void canmv_usb_device_cdc_init(void);
 
 extern void canmv_usb_device_mtp_init(void);
 
-extern void canmv_usb_device_init(void *usb_base);
+extern void board_usb_device_init(void *usb_base);
