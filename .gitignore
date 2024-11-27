@@ -52,4 +52,4 @@ rtthread.map
 link.lds
 link_stacksize.lds
 kconfig-mconf
-kernel/bsp/maix3/applications/sdk_version.h
+kernel/bsp/maix3/sdk_version.h

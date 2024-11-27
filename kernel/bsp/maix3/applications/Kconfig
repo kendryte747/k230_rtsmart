@@ -1,5 +1,0 @@
-menu "Applications Configuration"
-
-    source "applications/user/Kconfig"
-
-endmenu

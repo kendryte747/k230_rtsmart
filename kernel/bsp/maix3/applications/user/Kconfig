@@ -1,9 +1,0 @@
-menuconfig RTT_ENABLE_USER_APP
-    bool "Enable User Applications"
-    default n
-
-    if RTT_ENABLE_USER_APP
-
-
-    endif
-

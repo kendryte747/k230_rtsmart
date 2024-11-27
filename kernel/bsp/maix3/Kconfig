@@ -21,7 +21,15 @@ source "$RTT_DIR/Kconfig"
 # comment "Be Careful use RT-Smart Online Packages"
 # source "$PKGS_DIR/Kconfig"
 
-comment "K230 sdk custom config start"
+comment "Application Configure Start"
+
+config USER_APP_DIR
+    string "User Applications Directory"
+    default "applications"
+
+source "$USER_APP_DIR/Kconfig"
+
+comment "K230 Custom Configure Start"
 
 source "applications/Kconfig"
 source "board/Kconfig"
