@@ -1,88 +1,95 @@
-menu "Kernel Testcase"
-
-config UTEST_MEMHEAP_TC
-    bool "memheap stability test"
+menuconfig ENABLE_K230_UTEST
+    bool "Kernel Testcase"
     default n
-    depends on RT_USING_MEMHEAP
+    select RT_USING_UTEST
 
-config UTEST_IRQ_TC
-    bool "IRQ test"
-    default n
+    if ENABLE_K230_UTEST
+        config UTEST_MEMHEAP_TC
+            bool "memheap stability test"
+            default n
+            depends on RT_USING_MEMHEAP
 
-config UTEST_SEMAPHORE_TC
-    bool "semaphore test"
-    default n
-    depends on RT_USING_SEMAPHORE
+        config UTEST_IRQ_TC
+            bool "IRQ test"
+            default n
 
-config UTEST_EVENT_TC
-    bool "event test"
-    default n
-    depends on RT_USING_EVENT
+        config UTEST_SEMAPHORE_TC
+            bool "semaphore test"
+            default n
+            depends on RT_USING_SEMAPHORE
 
-config UTEST_TIMER_TC
-    bool "timer test"
-    default n
+        config UTEST_EVENT_TC
+            bool "event test"
+            default n
+            depends on RT_USING_EVENT
 
-config UTEST_MESSAGEQUEUE_TC
-    bool "message queue test"
-    default n
+        config UTEST_TIMER_TC
+            bool "timer test"
+            default n
 
-config UTEST_MUTEX_TC
-    bool "mutex test"
-    default n
+        config UTEST_MESSAGEQUEUE_TC
+            bool "message queue test"
+            default n
 
-config UTEST_MAILBOX_TC
-    bool "mailbox test"
-    default n
+        config UTEST_MUTEX_TC
+            bool "mutex test"
+            default n
 
-config UTEST_THREAD_TC
-    bool "thread test"
-    default n
-    select RT_USING_TIMER_SOFT
-    select RT_USING_THREAD
+        config UTEST_MAILBOX_TC
+            bool "mailbox test"
+            default n
 
-config UTEST_MMU_TC
-    bool "MMU test"
-    default n
+        config UTEST_THREAD_TC
+            bool "thread test"
+            default n
+            select RT_USING_TIMER_SOFT
+            select RT_USING_THREAD
 
-config UTEST_ADC
-    bool "ADC test"
-    default n
+        config UTEST_MMU_TC
+            bool "MMU test"
+            default n
 
-config UTEST_GPIO
-    bool "GPIO test"
-    default n
+        config UTEST_ADC_TC
+            bool "ADC test"
+            default n
 
-config UTEST_SPI
-    bool "SPI test"
-    default n
+        config UTEST_GPIO_TC
+            bool "GPIO test"
+            default n
 
-config UTEST_OTP
-    bool "OTP test"
-    default n
+        config UTEST_GPIO_IRQ_TC
+            bool "GPIO irq test"
+            default n
 
-config UTEST_WDT
-    bool "WatchDog test"
-    default n
-    
-config UTEST_TS
-    bool "TS test"
-    default n
+        config UTEST_SPI_NAND_TC
+            bool "SPI nand test"
+            default n
 
-config UTEST_GPIO
-    bool "GPIO test"
-    default n
+        config UTEST_I2C_TC
+            bool "I2C test"
+            default n
 
-config UTEST_PWM
-    bool "PWM test"
-    default n
+        config UTEST_OTP_TC
+            bool "OTP test"
+            default n
 
-config UTEST_HWTIMER
-    bool "hwtimer test"
-    default n
+        config UTEST_WDT_TC
+            bool "WatchDog test"
+            default n
+            
+        config UTEST_TS_TC
+            bool "TS test"
+            default n
 
-config UTEST_RTC
-    bool "rtc test"
-    default n
+        config UTEST_PWM_TC
+            bool "PWM test"
+            default n
 
-endmenu
+        config UTEST_HWTIMER_TC
+            bool "hwtimer test"
+            default n
+
+        config UTEST_RTC_TC
+            bool "rtc test"
+            default n
+    endif

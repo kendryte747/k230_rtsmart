@@ -36,42 +36,40 @@ if GetDepend(['UTEST_THREAD_TC']):
 if GetDepend(['UTEST_MMU_TC']):
     src += ['mmu_tc.c']
 
-if GetDepend(['UTEST_I2C_OV9282']):
-    src += ['i2c_unitest_ov9282.c']
-
-if GetDepend(['UTEST_I2C_TMP103']):
-    src += ['i2c_unitest_tmp103.c']
-
-if GetDepend(['UTEST_ADC']):
+if GetDepend(['UTEST_ADC_TC']):
     src += ['adc_tc.c']
 
 if GetDepend(['UTEST_GPIO']):
     src += ['gpio_unitest_rw.c']
 
-if GetDepend(['UTEST_GPIO']):
+if GetDepend(['UTEST_GPIO_IRQ_TC']):
     src += ['gpio_unitest_irq.c']
 
-if GetDepend(['UTEST_SPI_NAND']):
+if GetDepend(['UTEST_SPI_NAND_TC']):
     src += ['spi_nandflash_w25n01gv.c']
 
-if GetDepend(['UTEST_OTP']):
+if GetDepend(['UTEST_I2C_TC']):
+    # src += ['i2c_unitest_ov9282.c']
+    src += ['i2c_unitest_tmp103.c']
+
+if GetDepend(['UTEST_OTP_TC']):
     src += ['otp_tc.c']
 
-if GetDepend(['UTEST_WDT']):
+if GetDepend(['UTEST_WDT_TC']):
     src += ['wdt_irq_tc.c']
     
-if GetDepend(['UTEST_TS']):
+if GetDepend(['UTEST_TS_TC']):
     src += ['ts_tc.c']
 
-if GetDepend(['UTEST_PWM']):
+if GetDepend(['UTEST_PWM_TC']):
     src += ['pwm_tc.c']
 
-if GetDepend(['UTEST_HWTIMER']):
+if GetDepend(['UTEST_HWTIMER_TC']):
     src += ['hwtimer_tc.c']
 
-if GetDepend(['UTEST_RTC']):
+if GetDepend(['UTEST_RTC_TC']):
     src += ['rtc_tc.c']
 
-group = DefineGroup('utestcases', src, depend = ['RT_USING_UTEST'], CPPPATH = CPPPATH)
+group = DefineGroup('utestcases', src, depend = ['RT_USING_UTEST', 'ENABLE_K230_UTEST'], CPPPATH = CPPPATH)
 
 Return('group')
