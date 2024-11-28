@@ -400,9 +400,9 @@ static int dwc2_chan_alloc(struct usbh_bus *bus)
     size_t flags;
     int chidx;
 
+    flags = usb_osal_enter_critical_section();
     for (chidx = 0; chidx < CONFIG_USBHOST_PIPE_NUM; chidx++) {
         if (!g_dwc2_hcd[bus->hcd.hcd_id].chan_pool[chidx].inuse) {
-            flags = usb_osal_enter_critical_section();
             g_dwc2_hcd[bus->hcd.hcd_id].chan_pool[chidx].inuse = true;
             /* cann't get usbh_bus in dwc2_chan_free, so deinit here */
             if (g_dwc2_hcd[bus->hcd.hcd_id].chan_pool[chidx].do_split == 1) {
@@ -418,7 +418,7 @@ static int dwc2_chan_alloc(struct usbh_bus *bus)
             return chidx;
         }
     }
-
+    usb_osal_leave_critical_section(flags);
     return -1;
 }
 
@@ -845,14 +845,12 @@ int usbh_submit_urb(struct usbh_urb *urb)
         return -USB_ERR_BUSY;
     }
 
-    flags = usb_osal_enter_critical_section();
-
     chidx = dwc2_chan_alloc(bus);
     if (chidx == -1) {
-        usb_osal_leave_critical_section(flags);
         return -USB_ERR_NOMEM;
     }
 
+    flags = usb_osal_enter_critical_section();
     chan = &g_dwc2_hcd[bus->hcd.hcd_id].chan_pool[chidx];
     chan->chidx = chidx;
     chan->urb = urb;
