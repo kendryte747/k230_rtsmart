@@ -15,6 +15,8 @@ if GetDepend(['ENABLE_CANMV_USB_DEV']):
     if GetDepend(['CHERRY_USB_DEVICE_ENABLE_CLASS_MTP']):
         src += Glob('usbd_mtp.c')
 
+if GetDepend(['ENABLE_CHERRY_USB_HOST']):
+
     if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_NET_RTL8152']):
         src += Glob('usbh_net_rtl8152.c')
 
@@ -30,7 +32,7 @@ if GetDepend(['ENABLE_CANMV_USB_DEV']):
     if GetDepend(['CHERRY_USB_HOST_ENABLE_CLASS_SERIAL_EC200M']):
         src += Glob('usbh_serial_ec200m.c')
 
-group = DefineGroup('CanmVUSB', src, depend = [], CPPPATH = CPPPATH)
+group = DefineGroup('CanMVUSB', src, depend = [], CPPPATH = CPPPATH)
 
 objs = [group]
 
