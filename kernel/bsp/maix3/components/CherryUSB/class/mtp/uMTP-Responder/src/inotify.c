@@ -67,23 +67,29 @@ void inotify_thread(void* arg)
 	fs_entry *entry, *entry_parent;
 
 	while (1) {
-		if (RT_EOK != rt_mq_recv(mtp_inty_mq, &msg, sizeof(file_chg_msg_t), RT_WAITING_FOREVER))
+		if (RT_EOK != rt_mq_recv(mtp_inty_mq, &msg, sizeof(file_chg_msg_t), RT_WAITING_FOREVER)) {
 			continue;
-		if (mtp_fs_db_valid() == 0)
+		}
+		if (mtp_fs_db_valid() == 0) {
 			goto msg_free;
+		}
 		send_event_flag = 0;
 		if (msg.type == NTY_FILE_ADD) {
 			filefoundinfo new_finfo;
 			fs_entry_stat(msg.path, &new_finfo);
 			seg_next = msg.path;
 			pthread_mutex_lock(&ctx->inotify_mutex);
-			if (mtp_fs_db_valid() == 0)
+			if (mtp_fs_db_valid() == 0) {
 				goto mtx_free;
+			}
 			seg = strtok_r(NULL, "/", &seg_next);
-			if (strncmp(seg, "sdcard", sizeof("sdcard")) != 0)
+			if((0x00 != strncmp(seg, "data", sizeof("data"))) && \
+				(0x00 != strncmp(seg, "sdcard", sizeof("sdcard"))))
+			{
 				goto mtx_free;
+			}
 			db = ctx->fs_db;
-			storage_id = ctx->storages[0].storage_id;
+			storage_id = mtp_get_storage_id_by_name(ctx, seg); // ctx->storages[0].storage_id;
 			seg = "/";
 			parent = 0;
 			entry_parent = NULL;
@@ -91,14 +97,16 @@ void inotify_thread(void* arg)
 				strncpy(find_finfo.filename, seg, FS_HANDLE_MAX_FILENAME_SIZE);
 				entry = search_entry(db, &find_finfo, parent, storage_id);
 				if (entry) {
-					if (entry->watch_descriptor == -1)
+					if (entry->watch_descriptor == -1) {
 						break;
+					}
 					parent = entry->handle;
 					entry_parent = entry;
 					continue;
 				}
-				if (entry_parent == NULL)
+				if (entry_parent == NULL) {
 					break;
+				}
 				// If the entry is not in the db, add it and trigger an MTP_EVENT_OBJECT_ADDED event
 				entry = add_entry(db, &new_finfo, parent, storage_id );
 				if (entry) {
@@ -109,18 +117,23 @@ void inotify_thread(void* arg)
 				break;
 			} while (seg = strtok_r(NULL, "/", &seg_next));
 			pthread_mutex_unlock(&ctx->inotify_mutex);
-			if (send_event_flag)
+			if (send_event_flag) {
 				mtp_push_event(ctx, MTP_EVENT_OBJECT_ADDED, 1, (uint32_t *)&handle);
+			}
 		} else if (msg.type == NTY_FILE_CHG) {
 			seg_next = msg.path;
 			pthread_mutex_lock(&ctx->inotify_mutex);
-			if (mtp_fs_db_valid() == 0)
+			if (mtp_fs_db_valid() == 0) {
 				goto mtx_free;
+			}
 			seg = strtok_r(NULL, "/", &seg_next);
-			if (strncmp(seg, "sdcard", sizeof("sdcard")) != 0)
+			if((0x00 != strncmp(seg, "data", sizeof("data"))) && \
+				(0x00 != strncmp(seg, "sdcard", sizeof("sdcard"))))
+			{
 				goto mtx_free;
+			}
 			db = ctx->fs_db;
-			storage_id = ctx->storages[0].storage_id;
+			storage_id = mtp_get_storage_id_by_name(ctx, seg); // ctx->storages[0].storage_id;
 			seg = "/";
 			parent = 0;
 			entry_parent = NULL;
@@ -128,8 +141,9 @@ void inotify_thread(void* arg)
 				strncpy(find_finfo.filename, seg, FS_HANDLE_MAX_FILENAME_SIZE);
 				entry = search_entry(db, &find_finfo, parent, storage_id);
 				if (entry) {
-					if (entry_parent && (entry_parent->watch_descriptor == -1))
+					if (entry_parent && (entry_parent->watch_descriptor == -1)) {
 						goto mtx_free;
+					}
 					parent = entry->handle;
 					entry_parent = entry;
 					continue;
@@ -140,18 +154,23 @@ void inotify_thread(void* arg)
 			handle = entry->handle;
 			send_event_flag = 1;
 			pthread_mutex_unlock(&ctx->inotify_mutex);
-			if (send_event_flag)
+			if (send_event_flag) {
 				mtp_push_event(ctx, MTP_EVENT_OBJECT_INFO_CHANGED, 1, (uint32_t *)&handle);
+			}
 		} else if (msg.type == NTY_FILE_RM) {
 			seg_next = msg.path;
 			pthread_mutex_lock(&ctx->inotify_mutex);
-			if (mtp_fs_db_valid() == 0)
+			if (mtp_fs_db_valid() == 0) {
 				goto mtx_free;
+			}
 			seg = strtok_r(NULL, "/", &seg_next);
-			if (strncmp(seg, "sdcard", sizeof("sdcard")) != 0)
+			if((0x00 != strncmp(seg, "data", sizeof("data"))) && \
+				(0x00 != strncmp(seg, "sdcard", sizeof("sdcard"))))
+			{
 				goto mtx_free;
+			}
 			db = ctx->fs_db;
-			storage_id = ctx->storages[0].storage_id;
+			storage_id = mtp_get_storage_id_by_name(ctx, seg); // ctx->storages[0].storage_id;
 			seg = "/";
 			parent = 0;
 			entry_parent = NULL;
@@ -159,8 +178,9 @@ void inotify_thread(void* arg)
 				strncpy(find_finfo.filename, seg, FS_HANDLE_MAX_FILENAME_SIZE);
 				entry = search_entry(db, &find_finfo, parent, storage_id);
 				if (entry) {
-					if (entry_parent && (entry_parent->watch_descriptor == -1))
+					if (entry_parent && (entry_parent->watch_descriptor == -1)) {
 						goto mtx_free;
+					}
 					parent = entry->handle;
 					entry_parent = entry;
 					continue;
@@ -177,12 +197,14 @@ void inotify_thread(void* arg)
 			handle = entry->handle;
 			send_event_flag = 1;
 			pthread_mutex_unlock(&ctx->inotify_mutex);
-			if (send_event_flag)
+			if (send_event_flag) {
 				mtp_push_event(ctx, MTP_EVENT_OBJECT_REMOVED, 1, (uint32_t *)&handle);
+			}
 		}
 msg_free:
-		if (msg.path)
+		if (msg.path) {
 			free(msg.path);
+		}
 		continue;
 mtx_free:
 		pthread_mutex_unlock(&ctx->inotify_mutex);
@@ -221,8 +243,9 @@ int inotify_handler_filechange(int type, char *path)
 		return 0;
 	file_chg_msg_t msg = {};
 	msg.type = type;
-	if (path)
+	if (path) {
 		msg.path = rt_strdup(path);
+	}
 	if (mtp_inty_mq) {
 		rt_mq_send_wait(mtp_inty_mq, &msg, sizeof(file_chg_msg_t), RT_WAITING_FOREVER);
 	}
