@@ -317,7 +317,7 @@ void set_usage_period(int argc, char**argv)
 MSH_CMD_EXPORT(set_usage_period, set the period of the system usage ms);
 
 /**test code*/
-#ifdef RT_USING_UTEST
+#if defined(RT_USING_UTEST) && defined(UTEST_USAGE_TC)
 #include "utest.h"
 
 #define TEST_VAL_USAGE_FULL 0xFFF

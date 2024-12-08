@@ -28,9 +28,21 @@
 
 #include <rtdef.h>
 
-#define TS_READ_OFFSET             0x4
-#define TS_CONFIG_OFFSET           0x0
+#define RT_DEVICE_TS_CTRL_SET_MODE          0x01
+#define RT_DEVICE_TS_CTRL_GET_MODE          0x02
+#define RT_DEVICE_TS_CTRL_SET_TRIM          0x03
+#define RT_DEVICE_TS_CTRL_GET_TRIM          0x04
 
-rt_size_t ts_device_read(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size);
+#define RT_DEVICE_TS_CTRL_MODE_SINGLE       0x01
+#define RT_DEVICE_TS_CTRL_MODE_CONTINUUOS   0x02
+
+void tsensor_init(uint8_t trim_value);
+
+void tsensor_start(rt_uint8_t continuos_mode);
+void tsensor_stop(void);
+
+int tsensor_read_data(uint16_t *data, uint32_t timeout_ms);
+
+double tsensor_calculate_temperature(uint16_t data);
 
 #endif /*__DRV_TS__*/

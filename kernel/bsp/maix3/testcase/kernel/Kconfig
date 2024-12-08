@@ -92,4 +92,8 @@ menuconfig ENABLE_K230_UTEST
         config UTEST_RTC_TC
             bool "rtc test"
             default n
+
+        config UTEST_USAGE_TC
+            bool "usage test"
+            default n
     endif

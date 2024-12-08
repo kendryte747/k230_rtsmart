@@ -183,10 +183,18 @@ menu "Drivers Configuration"
             config RT_USING_SPI
                 bool "Enable SPI1 device driver"
                 default n
-            
-            config RT_USING_TS
-                bool "Enable Tsensor device driver"
+
+            menuconfig RT_USING_TS
+                bool "Enable Tsensor driver"
                 default n
+
+                if RT_USING_TS
+
+                    config DRV_TS_USE_RT_DEVICE
+                        bool "Tsensor driver use RT Device framework"
+                        default y
+
+                endif
             
             menuconfig RT_USING_CANAAN_UART
                 bool "Enable Uart Canaan device model driver"

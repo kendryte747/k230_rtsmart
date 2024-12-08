@@ -19,6 +19,8 @@
 #include "utest.h"
 #include <math.h>
 
+#include "drv_ts.h"
+
 #define TS_DEV_NAME               "ts"
 rt_device_t ts_dev = RT_NULL;
 
@@ -62,43 +64,82 @@ static void ts_close(void)
     rt_device_close(ts_dev);
 }
 
+static void ts_device_single_mode(void)
+{
+    rt_uint8_t mode = RT_DEVICE_TS_CTRL_MODE_SINGLE;
+    rt_device_control(ts_dev, RT_DEVICE_TS_CTRL_SET_MODE, &mode);
+}
+
+static void ts_device_continuos_mode(void)
+{
+    rt_uint8_t mode = RT_DEVICE_TS_CTRL_MODE_CONTINUUOS;
+    rt_device_control(ts_dev, RT_DEVICE_TS_CTRL_SET_MODE, &mode);
+}
+
 static void test_ts_read(void)
 {
-    void *buffer = RT_NULL;
-    rt_uint32_t reval;
-    rt_uint32_t ts_val = 0;
-    rt_uint32_t cnt;
-    double code = 0, temp = 0;
+    double temp = 0.0f;
 
     ts_open();
 
-    for(cnt=0; cnt<5; cnt++)
-    {
-        reval = rt_device_read(ts_dev, 0, buffer, 4);
-        if(reval <= 0)
-        {
+    ///////////////////////////////////////////////////////////////////////////
+    rt_kprintf("enter continuos mode\n");
+
+    ts_device_continuos_mode();
+    for(int i = 0; i < 5; i++) {
+        if(sizeof(double) != rt_device_read(ts_dev, 0, &temp, sizeof(double))) {
             uassert_false(1);
-            return;
+            goto _failed;
         }
+        rt_kprintf("Continuos mode Temperature = %d.%d C\n", ((int)(temp * 1000000) / 1000000), ((int)(temp * 1000000) % 1000000));
 
-        ts_val = *(uint32_t *)buffer;
-        code = (double)(ts_val & 0xfff);
-        
-        rt_thread_mdelay(2600);
-
-        if(ts_val >> 12)
-        {
-            temp = (1e-10 * pow(code, 4) * 1.01472 - 1e-6 * pow(code, 3) * 1.10063 + 4.36150 * 1e-3 * pow(code, 2) - 7.10128 * code + 3565.87);
-
-        #ifdef _debug_print
-            float_printf("ts_val: 0x%x, TS = %lf C\n", ts_val, temp);
-        #else
-            // rt_kprintf("ts_val: 0x%x, TS = %d C\n", ts_val, (int)temp);
-            rt_kprintf("ts_val: 0x%x, TS = %d.%d C\n", ts_val, ((int)(temp * 1000000) / 1000000), ((int)(temp * 1000000) % 1000000));
-        #endif
-        }
+        rt_thread_delay(rt_tick_from_millisecond(500));
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    rt_kprintf("enter single mode\n");
+
+    ts_device_single_mode();
+    for(int i = 0; i < 5; i++) {
+        if(sizeof(double) != rt_device_read(ts_dev, 0, &temp, sizeof(double))) {
+            uassert_false(1);
+            goto _failed;
+        }
+        rt_kprintf("Single mode Temperature = %d.%d C\n", ((int)(temp * 1000000) / 1000000), ((int)(temp * 1000000) % 1000000));
+    
+        rt_thread_delay(rt_tick_from_millisecond(500));
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    rt_kprintf("enter continuos mode\n");
+
+    ts_device_continuos_mode();
+    for(int i = 0; i < 5; i++) {
+        if(sizeof(double) != rt_device_read(ts_dev, 0, &temp, sizeof(double))) {
+            uassert_false(1);
+            goto _failed;
+        }
+        rt_kprintf("Continuos mode Temperature = %d.%d C\n", ((int)(temp * 1000000) / 1000000), ((int)(temp * 1000000) % 1000000));
+
+        rt_thread_delay(rt_tick_from_millisecond(500));
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    rt_kprintf("enter single mode\n");
+
+    ts_device_single_mode();
+    for(int i = 0; i < 5; i++) {
+        if(sizeof(double) != rt_device_read(ts_dev, 0, &temp, sizeof(double))) {
+            uassert_false(1);
+            goto _failed;
+        }
+        rt_kprintf("Single mode Temperature = %d.%d C\n", ((int)(temp * 1000000) / 1000000), ((int)(temp * 1000000) % 1000000));
+    
+        rt_thread_delay(rt_tick_from_millisecond(500));
+    }
+    ///////////////////////////////////////////////////////////////////////////
+
+_failed:
     ts_close();
 
     return;
