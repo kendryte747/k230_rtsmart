@@ -165,6 +165,13 @@ bool sysctl_pwr_set_tim(sysctl_pwr_domain_e powerdomain, sysctl_pwr_tim_e timtyp
 
     switch(powerdomain)
     {
+        case SYSCTL_PD_CPU0:
+        {
+            pwr_reg = (volatile uint32_t *)&sysctl_pwr->cpu0_pwr_tim;
+            lpi_reg = (volatile uint32_t *)&sysctl_pwr->cpu0_lpi_tim;
+            wfi_reg = (volatile uint32_t *)&sysctl_pwr->cpu0_pwr_tim;
+            break;
+        }
         case SYSCTL_PD_CPU1:
         {
             pwr_reg = (volatile uint32_t *)&sysctl_pwr->cpu1_pwr_tim;
@@ -309,6 +316,13 @@ bool sysctl_pwr_get_tim(sysctl_pwr_domain_e powerdomain, sysctl_pwr_tim_e timtyp
 
     switch(powerdomain)
     {
+        case SYSCTL_PD_CPU0:
+        {
+            pwr_reg = (volatile uint32_t *)&sysctl_pwr->cpu0_pwr_tim;
+            lpi_reg = (volatile uint32_t *)&sysctl_pwr->cpu0_lpi_tim;
+            wfi_reg = (volatile uint32_t *)&sysctl_pwr->cpu0_pwr_tim;
+            break;
+        }
         case SYSCTL_PD_CPU1:
         {
             pwr_reg = (volatile uint32_t *)&sysctl_pwr->cpu1_pwr_tim;
@@ -377,6 +391,21 @@ bool sysctl_pwr_set_poweroff_keep_reset(sysctl_pwr_domain_e powerdomain, bool en
 {
     volatile uint32_t ret;
 
+    if(SYSCTL_PD_CPU0 == powerdomain)
+    {
+        ret = sysctl_pwr->cpu0_pwr_lpi_ctl;
+        ret &= 0xfff7fff7;
+        if(true == enable)
+        {
+            sysctl_pwr->cpu0_pwr_lpi_ctl = ret | ((1 << 3) | (1 << 19));
+        }
+        else
+        {
+            sysctl_pwr->cpu0_pwr_lpi_ctl = ret | ((0 << 3) | (1 << 19));
+        }
+
+        return true;
+    } else
     if(SYSCTL_PD_CPU1 == powerdomain)
     {
         ret = sysctl_pwr->cpu1_pwr_lpi_ctl;
@@ -400,6 +429,14 @@ bool sysctl_pwr_set_poweroff_keep_reset(sysctl_pwr_domain_e powerdomain, bool en
 
 bool sysctl_pwr_get_poweroff_keep_reset(sysctl_pwr_domain_e powerdomain, bool *enable)
 {
+    if(SYSCTL_PD_CPU0 == powerdomain)
+    {
+        if(sysctl_pwr->cpu0_pwr_lpi_ctl & (1 << 3))
+            *enable = true;
+        else
+            *enable = false;
+        return true;
+    } else
     if(SYSCTL_PD_CPU1 == powerdomain)
     {
         if(sysctl_pwr->cpu1_pwr_lpi_ctl & (1 << 3))
@@ -425,6 +462,20 @@ bool sysctl_pwr_set_auto_pwr(sysctl_pwr_domain_e powerdomain, bool enable)
 {
     volatile uint32_t ret;
 
+    if(SYSCTL_PD_CPU0 == powerdomain)
+    {
+        ret = sysctl_pwr->cpu0_pwr_lpi_ctl;
+        ret &= 0xfffbfffb;
+        if(true == enable)
+        {
+            sysctl_pwr->cpu0_pwr_lpi_ctl = ret | ((1 << 2) | (1 << 18));
+        }
+        else
+        {
+            sysctl_pwr->cpu0_pwr_lpi_ctl = ret | ((0 << 2) | (1 << 18));
+        }
+        return true;
+    } else
     if(SYSCTL_PD_CPU1 == powerdomain)
     {
         ret = sysctl_pwr->cpu1_pwr_lpi_ctl;
@@ -447,6 +498,14 @@ bool sysctl_pwr_set_auto_pwr(sysctl_pwr_domain_e powerdomain, bool enable)
 
 bool sysctl_pwr_get_auto_pwr(sysctl_pwr_domain_e powerdomain, bool *enable)
 {
+    if(SYSCTL_PD_CPU0 == powerdomain)
+    {
+        if(sysctl_pwr->cpu0_pwr_lpi_ctl & (1 << 2))
+            *enable = true;
+        else
+            *enable = false;
+        return true;
+    } else
     if(SYSCTL_PD_CPU1 == powerdomain)
     {
         if(sysctl_pwr->cpu1_pwr_lpi_ctl & (1 << 2))
@@ -503,6 +562,18 @@ bool sysctl_pwr_set_lpi(sysctl_pwr_domain_e powerdomain, bool enable)
 {
     switch(powerdomain)
     {
+        case SYSCTL_PD_CPU0:
+        {
+            sysctl_pwr->cpu0_pwr_lpi_ctl |= (true == enable) ? ((1 << 5) | (1 << 21)) : ((1 << 4) | (1 << 20));
+
+            //usleep(500);
+	        rt_thread_delay(1);
+
+            if(true == enable)
+                return (sysctl_pwr->cpu0_pwr_lpi_state & (1 << 3)) ? true:false;
+            else
+                return (sysctl_pwr->cpu0_pwr_lpi_state & (1 << 2)) ? true:false;
+        }
         case SYSCTL_PD_CPU1:
         {
             sysctl_pwr->cpu1_pwr_lpi_ctl |= (true == enable) ? ((1 << 5) | (1 << 21)) : ((1 << 4) | (1 << 20));
@@ -601,6 +672,12 @@ bool sysctl_pwr_set_power(sysctl_pwr_domain_e powerdomain, bool enable)
 
     switch(powerdomain)
     {
+        case SYSCTL_PD_CPU0:
+        {
+            pwr_ctl_reg = (volatile uint32_t *)&sysctl_pwr->cpu0_pwr_lpi_ctl;
+            pwr_sta_reg = (volatile uint32_t *)&sysctl_pwr->cpu0_pwr_lpi_state;
+            break;
+        }
         case SYSCTL_PD_CPU1:
         {
             pwr_ctl_reg = (volatile uint32_t *)&sysctl_pwr->cpu1_pwr_lpi_ctl;
@@ -698,20 +775,22 @@ bool sysctl_pwr_set_power_multi(sysctl_pwr_domain_e powerdomain, bool enable)
             rt_kprintf("error: enable too many times\n");
     } else if (ref_count[powerdomain]) {
         ref_count[powerdomain]--;
-        if (ref_count[powerdomain] == 0) {
-            if (powerdomain == SYSCTL_PD_DISP) {
-                while (kd_hardlock_lock(HARDLOCK_DISP));
-                if (kd_hardlock_lock(HARDLOCK_DISP_CPU0) == 0) {
-                    kd_hardlock_unlock(HARDLOCK_DISP_CPU0);
-                    ret = sysctl_pwr_set_power(powerdomain, enable);
-                }
-                kd_hardlock_unlock(HARDLOCK_DISP_CPU1);
-                kd_hardlock_unlock(HARDLOCK_DISP);
-            } else {
+    }
+
+    if (ref_count[powerdomain] == 0) {
+        if (powerdomain == SYSCTL_PD_DISP) {
+            while (kd_hardlock_lock(HARDLOCK_DISP));
+            if (kd_hardlock_lock(HARDLOCK_DISP_CPU0) == 0) {
+                kd_hardlock_unlock(HARDLOCK_DISP_CPU0);
                 ret = sysctl_pwr_set_power(powerdomain, enable);
             }
+            kd_hardlock_unlock(HARDLOCK_DISP_CPU1);
+            kd_hardlock_unlock(HARDLOCK_DISP);
+        } else {
+            ret = sysctl_pwr_set_power(powerdomain, enable);
         }
     }
+
     rt_hw_interrupt_enable(level);
 
     return ret;

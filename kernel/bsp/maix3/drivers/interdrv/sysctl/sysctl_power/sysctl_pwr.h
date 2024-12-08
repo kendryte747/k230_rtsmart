@@ -126,6 +126,7 @@ typedef enum
     SYSCTL_PD_DISP,
     SYSCTL_PD_VPU,
     SYSCTL_PD_DPU,
+    SYSCTL_PD_CPU0,
     SYSCTL_PD_MAX,
 } sysctl_pwr_domain_e;
 

@@ -29,6 +29,8 @@
 #include "drv_gpio.h"
 #endif // CONFIG_BOARD_K230_CANMV_LCKFB
 
+#include "sysctl_pwr.h"
+
 #ifdef ENABLE_CHERRY_USB
 
 #include "canmv_usb.h"
@@ -157,6 +159,9 @@ static void check_bank_voltage(void)
 }
 
 int main(void) {
+  sysctl_pwr_off(SYSCTL_PD_CPU0);
+  sysctl_pwr_off(SYSCTL_PD_DPU);
+
   check_bank_voltage();
 
   rt_kprintf("\n#############SDK VERSION######################################\n");
