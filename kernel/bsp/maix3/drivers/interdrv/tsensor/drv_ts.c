@@ -58,27 +58,19 @@
 #define TSENR_TS_DOUT_VALID_POS   12
 #define TSENR_TS_DOUT_MASK        0xFFF
 
+static struct rt_mutex ts_mutex;
+
+static uint8_t ts_trim = 8;
+static uint8_t ts_mode = RT_DEVICE_TS_CTRL_MODE_CONTINUUOS;
+
 static void *ts_base_addr = RT_NULL;
 
-void tsensor_init(uint8_t trim_value) {
-    if (ts_base_addr == RT_NULL) return; // Ensure base address is set
-
-    // Ensure the trim_value is within range (4 bits)
-    trim_value &= 0xF;
-
-    // Configure the TSensor with the default settings
-    uint32_t reg_val = readl(ts_base_addr + REG_TSENW_OFFSET);
-    reg_val &= ~(0xF << TSENW_TS_TRIM_POS);       // Clear previous trim value
-    reg_val |= (trim_value << TSENW_TS_TRIM_POS); // Set new trim value
-    writel(reg_val, ts_base_addr + REG_TSENW_OFFSET);
-}
-
-void tsensor_start(rt_uint8_t continuos_mode) {
+static void tsensor_start(void) {
     if (ts_base_addr == RT_NULL) return; // Ensure base address is set
 
     // Ensure single output mode is selected and enable the TSensor
     uint32_t reg_val = readl(ts_base_addr + REG_TSENW_OFFSET);
-    if(RT_DEVICE_TS_CTRL_MODE_CONTINUUOS == continuos_mode) {
+    if(RT_DEVICE_TS_CTRL_MODE_CONTINUUOS == ts_mode) {
         reg_val |= (1 << TSENW_TS_CONV_MODE_POS); // Set continuous mode bit
     } else {
         reg_val &= ~(1 << TSENW_TS_CONV_MODE_POS); // Clear continuous mode bit
@@ -87,7 +79,7 @@ void tsensor_start(rt_uint8_t continuos_mode) {
     writel(reg_val, ts_base_addr + REG_TSENW_OFFSET);
 }
 
-void tsensor_stop(void) {
+static void tsensor_stop(void) {
     if (ts_base_addr == RT_NULL) return; // Ensure base address is set
 
     // Disable the TSensor
@@ -96,7 +88,7 @@ void tsensor_stop(void) {
     writel(reg_val, ts_base_addr + REG_TSENW_OFFSET);
 }
 
-int tsensor_read_data(uint16_t *data, uint32_t timeout_ms) {
+static int tsensor_read_data(uint16_t *data, uint32_t timeout_ms) {
     if (ts_base_addr == RT_NULL || data == RT_NULL) return -1; // Ensure base address is set
 
     uint32_t max_attempts = timeout_ms; // Max attempts for the given timeout in ms
@@ -116,7 +108,7 @@ int tsensor_read_data(uint16_t *data, uint32_t timeout_ms) {
     return -2; // Timeout error
 }
 
-double tsensor_calculate_temperature(uint16_t data) {
+static double tsensor_calculate_temperature(uint16_t data) {
     return (1e-10 * pow(data, 4) * 1.01472
             - 1e-6 * pow(data, 3) * 1.10063
             + 4.36150 * 1e-3 * pow(data, 2)
@@ -124,21 +116,118 @@ double tsensor_calculate_temperature(uint16_t data) {
             + 3565.87);
 }
 
+void tsensor_init(void) {
+    if (ts_base_addr == RT_NULL) return; // Ensure base address is set
+
+    if(RT_EOK != rt_mutex_take(&ts_mutex, rt_tick_from_millisecond(500))) {
+        rt_kprintf("%s mutex take timeout.\n");
+
+        return;
+    }
+
+    // Configure the TSensor with the default settings
+    uint32_t reg_val = readl(ts_base_addr + REG_TSENW_OFFSET);
+    reg_val &= ~(0xF << TSENW_TS_TRIM_POS);       // Clear previous trim value
+    reg_val |= (ts_trim << TSENW_TS_TRIM_POS); // Set new trim value
+    writel(reg_val, ts_base_addr + REG_TSENW_OFFSET);
+
+    rt_mutex_release(&ts_mutex);
+}
+
+void tsensor_set_trim(uint8_t trim) {
+    if(RT_EOK != rt_mutex_take(&ts_mutex, rt_tick_from_millisecond(500))) {
+        rt_kprintf("%s mutex take timeout.\n");
+
+        return;
+    }
+
+    // Ensure the trim_value is within range (4 bits)
+    ts_trim = trim & 0xF;
+
+    rt_mutex_release(&ts_mutex);
+
+    tsensor_init();
+}
+
+uint8_t tsensor_get_trim(void) {
+    uint8_t temp;
+
+    if(RT_EOK != rt_mutex_take(&ts_mutex, rt_tick_from_millisecond(500))) {
+        rt_kprintf("%s mutex take timeout.\n");
+        return -1;
+    }
+
+    temp = ts_trim;
+
+    rt_mutex_release(&ts_mutex);
+
+    return temp;
+}
+
+void tsensor_set_mode(uint8_t mode) {
+    if(RT_EOK != rt_mutex_take(&ts_mutex, rt_tick_from_millisecond(500))) {
+        rt_kprintf("%s mutex take timeout.\n");
+
+        return;
+    }
+
+    ts_mode = mode;
+
+    rt_mutex_release(&ts_mutex);
+}
+
+uint8_t tsensor_get_mode(void) {
+    uint8_t temp;
+
+    if(RT_EOK != rt_mutex_take(&ts_mutex, rt_tick_from_millisecond(500))) {
+        rt_kprintf("%s mutex take timeout.\n");
+        return -1;
+    }
+
+    temp = ts_mode;
+
+    rt_mutex_release(&ts_mutex);
+
+    return temp;
+}
+
+int tsensor_read_temp(double *temp) {
+    uint16_t data;
+
+    if(RT_EOK != rt_mutex_take(&ts_mutex, rt_tick_from_millisecond(500))) {
+        rt_kprintf("%s mutex take timeout.\n");
+        return -1;
+    }
+
+    tsensor_start();
+
+    rt_thread_mdelay(10);
+
+    if(0x00 == tsensor_read_data(&data, 100)) {
+        goto _succ;
+    }
+    tsensor_stop();
+
+    rt_mutex_release(&ts_mutex);
+
+    return -1;
+_succ:
+    tsensor_stop();
+
+    *((double *)temp) = tsensor_calculate_temperature(data);
+
+    rt_mutex_release(&ts_mutex);
+
+    return 0;
+}
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 #if defined (DRV_TS_USE_RT_DEVICE)
-struct ts_device_config {
-    uint8_t trim_val;
-    uint8_t work_mode;
-};
 
 static rt_err_t ts_deivce_open(rt_device_t dev, rt_uint16_t oflag)
 {
-    struct ts_device_config *cfg = (struct ts_device_config *)dev->user_data;
-    RT_ASSERT(cfg);
-
-    tsensor_init(cfg->trim_val);
+    tsensor_init();
 
     return RT_EOK;
 }
@@ -152,56 +241,36 @@ static rt_err_t ts_device_close(rt_device_t dev)
 
 static rt_size_t ts_device_read(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size)
 {
-    struct ts_device_config *cfg = (struct ts_device_config *)dev->user_data;
-    RT_ASSERT(cfg);
-
-    uint8_t work_mode = cfg->work_mode;
-
-    uint16_t data;
-
     if(sizeof(double) != size) {
         rt_kprintf("%s invalid buffer size %u\n", __func__, size);
         return 0;
     }
 
-    tsensor_start(work_mode);
-
-    rt_thread_mdelay(10);
-
-    if(0x00 == tsensor_read_data(&data, 100)) {
-        goto _succ;
+    if(0x00 != tsensor_read_temp(buffer)) {
+        return 0; // read failed
     }
-    tsensor_stop();
-
-    return 0; // read failed
-
-_succ:
-    tsensor_stop();
-
-    *((double *)buffer) = tsensor_calculate_temperature(data);
 
     return sizeof(double);
 }
 
 static rt_err_t ts_device_control(rt_device_t dev, int cmd, void *args)
 {
-    struct ts_device_config *cfg = (struct ts_device_config *)dev->user_data;
-    RT_ASSERT(cfg);
-
-    uint8_t trim_val = cfg->trim_val;
-    uint8_t work_mode = cfg->work_mode;
+    uint8_t trim_val = tsensor_get_trim();
+    uint8_t work_mode = tsensor_get_mode();
 
     switch(cmd) {
         case RT_DEVICE_TS_CTRL_SET_MODE: {
-            cfg->work_mode = (rt_uint8_t)(*(rt_uint8_t *)args);
+            work_mode = (rt_uint8_t)(*(rt_uint8_t *)args);
+
+            tsensor_set_mode(work_mode);
         } break;
         case RT_DEVICE_TS_CTRL_GET_MODE: {
             *((rt_uint8_t *)args) = (rt_uint8_t)work_mode;
         } break;
         case RT_DEVICE_TS_CTRL_SET_TRIM: {
-            cfg->trim_val = (rt_uint8_t)(*(rt_uint8_t *)args);
+            trim_val = (rt_uint8_t)(*(rt_uint8_t *)args);
 
-            tsensor_init(cfg->trim_val);
+            tsensor_set_trim(trim_val);
         } break;
         case RT_DEVICE_TS_CTRL_GET_TRIM: {
             *((rt_uint8_t *)args) = (rt_uint8_t)trim_val;
@@ -215,11 +284,6 @@ static rt_err_t ts_device_control(rt_device_t dev, int cmd, void *args)
 }
 
 static struct rt_device ts_device;
-
-static struct ts_device_config ts_device_cfg = {
-    .trim_val = 8,
-    .work_mode = RT_DEVICE_TS_CTRL_MODE_CONTINUUOS,
-};
 
 static const struct rt_device_ops ts_ops =
 {
@@ -249,8 +313,6 @@ static int register_ts_device(void)
     device->control    =     ts_device_control;
 #endif
 
-    device->user_data = &ts_device_cfg;
-
     if(RT_EOK != (ret = rt_device_register(device, "ts", RT_DEVICE_FLAG_RDWR))) {
         rt_kprintf("ts device register fail\n");
         return -1;
@@ -274,6 +336,11 @@ static int rt_hw_ts_init(void)
         return -2;
     }
 #endif // DRV_TS_USE_RT_DEVICE
+
+    if(RT_EOK != rt_mutex_init(&ts_mutex, "dev_ts", RT_IPC_FLAG_PRIO)) {
+        rt_kprintf("ts init mutex error\n");
+        return -3;
+    }
 
     return RT_EOK;
 }

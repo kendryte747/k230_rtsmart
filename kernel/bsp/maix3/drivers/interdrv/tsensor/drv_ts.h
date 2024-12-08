@@ -36,13 +36,14 @@
 #define RT_DEVICE_TS_CTRL_MODE_SINGLE       0x01
 #define RT_DEVICE_TS_CTRL_MODE_CONTINUUOS   0x02
 
-void tsensor_init(uint8_t trim_value);
+void tsensor_init(void);
 
-void tsensor_start(rt_uint8_t continuos_mode);
-void tsensor_stop(void);
+void tsensor_set_trim(uint8_t trim);
+uint8_t tsensor_get_trim(void);
 
-int tsensor_read_data(uint16_t *data, uint32_t timeout_ms);
+void tsensor_set_mode(uint8_t mode);
+uint8_t tsensor_get_mode(void);
 
-double tsensor_calculate_temperature(uint16_t data);
+int tsensor_read_temp(double *temp);
 
 #endif /*__DRV_TS__*/
