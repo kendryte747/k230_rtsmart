@@ -28,6 +28,8 @@
   #include "ntp.h"
 #endif
 
+#include "dfs_posix.h"
+
 struct misc_dev_handle {
   int cmd;
   int (*func)(void *args);
@@ -132,6 +134,7 @@ static int misc_close(struct dfs_fd *file) { return 0; }
 #define MISC_DEV_CMD_GET_MEMORY_SIZE    (0x1024 + 6)
 #define MISC_DEV_CMD_CREATE_SOFT_I2C    (0x1024 + 7)
 #define MISC_DEV_CMD_DELETE_SOFT_I2C    (0x1024 + 8)
+#define MISC_DEV_CMD_GET_FS_STAT        (0x1024 + 9)
 
 struct meminfo_t {
   size_t total_size;
@@ -350,6 +353,35 @@ static int misc_delete_soft_i2c_device(void *args) {
 #endif // RT_USING_SOFT_I2C
 }
 
+static int misc_get_fs_stat(void *args) {
+#define FS_STAT_PATH_LENGTH 32
+
+  struct statfs_wrap {
+      char path[FS_STAT_PATH_LENGTH];
+
+      struct statfs stat;
+  };
+
+  int ret = 0;
+  struct statfs_wrap wrap;
+
+  if(sizeof(wrap) != lwp_get_from_user(&wrap, args, sizeof(wrap))) {
+    rt_kprintf("%s get_frome_user failed\n", __func__);
+    return -1;
+  }
+
+  wrap.path[FS_STAT_PATH_LENGTH - 1] = 0;
+
+  if(0x00 == (ret = statfs(&wrap.path[0], &wrap.stat))) {
+    if(sizeof(wrap) != lwp_put_to_user(args, &wrap, sizeof(wrap))) {
+      rt_kprintf("%s put_to_user failed\n", __func__);
+      return -1;
+    }
+  }
+
+  return ret;
+}
+
 static const struct misc_dev_handle misc_handles[] = {
   {
     .cmd = MISC_DEV_CMD_READ_HEAP,
@@ -386,6 +418,10 @@ static const struct misc_dev_handle misc_handles[] = {
   {
     .cmd = MISC_DEV_CMD_DELETE_SOFT_I2C,
     .func = misc_delete_soft_i2c_device,
+  },
+  {
+    .cmd = MISC_DEV_CMD_GET_FS_STAT,
+    .func = misc_get_fs_stat,
   }
 };
 
