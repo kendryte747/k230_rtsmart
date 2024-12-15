@@ -31,6 +31,7 @@
 #include "board.h"
 #include "ioremap.h"
 #include "drv_rtc.h"
+#include "rtdef.h"
 
 struct rt_rtc_device
 {
@@ -263,7 +264,6 @@ static int rtc_date_time_set(int year, int month, int day, int hour, int minute,
     return 0;
 }
 
-
 static void rtc_timer_get(time_t *t)
 {
     volatile rtc_t *const rtc = (volatile rtc_t *)addr_base;
@@ -272,27 +272,26 @@ static void rtc_timer_get(time_t *t)
     if (interrupt_ctrl->timer_r_en == 0)
         interrupt_ctrl->timer_r_en = 1;
 
-    struct tm *tm;
+    struct tm tm;
     rtc_date_t date = rtc->date;
     rtc_time_t time = rtc->time;
 
-    tm->tm_sec = time.second;
-    tm->tm_min = time.minute;
-    tm->tm_hour = time.hour;
-    tm->tm_mday = date.day;
-    tm->tm_mon = date.month - 1;
-    tm->tm_year = (date.year_h * 100 + date.year_l) - 1900;
-    tm->tm_wday = time.week;
+    tm.tm_sec = time.second;
+    tm.tm_min = time.minute;
+    tm.tm_hour = time.hour;
+    tm.tm_mday = date.day;
+    tm.tm_mon = date.month - 1;
+    tm.tm_year = (date.year_h * 100 + date.year_l) - 1900;
+    tm.tm_wday = time.week;
 
-    *t = mktime(tm);
+    *t = timegm(&tm);
 }
 
 static void rtc_timer_set(time_t *t)
 {
-    struct tm *p_tm;
-    gmtime_r(t, p_tm);
+    struct tm *tm = gmtime(t);
 
-    rtc_date_time_set((p_tm->tm_year + 1900), p_tm->tm_mon + 1, p_tm->tm_mday, p_tm->tm_hour, p_tm->tm_min, p_tm->tm_sec, p_tm->tm_wday);
+    rtc_date_time_set((tm->tm_year + 1900), tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, tm->tm_wday);
 
     rtc_timer_set_clock_count_value(0);
     register_set_success();
@@ -310,18 +309,14 @@ static rt_err_t kd_rtc_close(rt_device_t dev)
 
 static rt_size_t kd_rtc_read(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size)
 {
-    time_t t;
-    rtc_timer_get(&t);
-    rt_memcpy(buffer, (void*)&t, sizeof(t));
-    return size;
+    rt_kprintf("%s->%d should not call this rtc ops\n", __func__, __LINE__);
+    return RT_ERROR;
 }
 
 static rt_size_t kd_rtc_write(rt_device_t dev, rt_off_t pos, const void *buffer, rt_size_t size)
 {
-    struct tm *tm = (struct tm*)buffer;
-    time_t t = mktime(tm);
-    rtc_timer_set(&t);
-    return size;
+    rt_kprintf("%s->%d should not call this rtc ops\n", __func__, __LINE__);
+    return RT_ERROR;
 }
 
 static rt_err_t rtc_alarm_get(void *args)
@@ -413,7 +408,6 @@ static rt_err_t kd_rtc_control(rt_device_t dev, int cmd, void *args)
     return RT_EOK;
 }
 
-
 const static struct rt_device_ops kd_rtc_ops =
 {
     .init = RT_NULL,
@@ -426,30 +420,35 @@ const static struct rt_device_ops kd_rtc_ops =
 
 static int rt_hw_rtc_init(void)
 {
-    struct tm *tm;
-    time_t t;
     pmu_isolation_rtc();
-    rt_memset(&rtc_device, 0, sizeof(rtc_device));
     addr_base = (void*)rt_ioremap((void *)RTC_BASE_ADDR, RTC_IO_SIZE);
 
+    rt_memset(&rtc_device, 0, sizeof(rtc_device));
     rtc_device.device.type        = RT_Device_Class_RTC;
     rtc_device.device.rx_indicate = RT_NULL;
     rtc_device.device.tx_complete = RT_NULL;
     rtc_device.device.ops         = &kd_rtc_ops;
     rtc_device.device.user_data   = &addr_base;
     rt_device_register(&rtc_device.device, "rtc", RT_DEVICE_FLAG_RDWR);
+
 #ifndef RT_FASTBOOT
     rt_kprintf("rtc driver register OK\n");
 #endif
-    tm->tm_year = 1970 - 1900;
-    tm->tm_mon = 1 - 1;
-    tm->tm_mday = 1;
-    tm->tm_wday = 5;
-    tm->tm_hour = 0;
-    tm->tm_min = 0;
-    tm->tm_sec = 0;
-    t = mktime(tm);
+
+#if 0
+    struct tm tm;
+    tm.tm_year = 1970 - 1900;
+    tm.tm_mon = 1 - 1;
+    tm.tm_mday = 1;
+    tm.tm_wday = 5;
+    tm.tm_hour = 0;
+    tm.tm_min = 0;
+    tm.tm_sec = 0;
+
+    time_t t = timegm(&tm);
     rtc_timer_set(&t);
+#endif
+
     return 0;
 }
 INIT_DEVICE_EXPORT(rt_hw_rtc_init);

@@ -22,6 +22,7 @@ if rtconfig.PLATFORM == 'gcc' and GetDepend('RT_USING_MUSL') and not GetDepend('
                 CPPPATH = CPPPATH, CPPDEFINES = CPPDEFINES, LIBS = LIBS, LIBPATH = LIBPATH)
         else:
             CPPPATH    = [cwd]
+            CPPPATH   += [cwd + '/include']
             LINKFLAGS = ' --specs=kernel.specs'
             group = DefineGroup('musl', src, depend = ['RT_USING_LIBC', 'RT_USING_MUSL'], CPPPATH = CPPPATH, LINKFLAGS = LINKFLAGS, 
                 CPPDEFINES = CPPDEFINES, LIBS = LIBS)

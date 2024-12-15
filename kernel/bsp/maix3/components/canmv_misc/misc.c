@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <sys/types.h>
@@ -127,14 +128,17 @@ static int misc_close(struct dfs_fd *file) { return 0; }
 
 #define MISC_DEV_CMD_READ_HEAP          (0x1024 + 0)
 #define MISC_DEV_CMD_READ_PAGE          (0x1024 + 1)
-#define MISC_DEV_CMD_CPU_USAGE          (0x1024 + 2)
-#define MISC_DEV_CMD_NTP_SYNC           (0x1024 + 3)
-#define MISC_DEV_CMD_GET_TIME_T         (0x1024 + 4)
-#define MISC_DEV_CMD_GET_CPU_TICK       (0x1024 + 5)
-#define MISC_DEV_CMD_GET_MEMORY_SIZE    (0x1024 + 6)
-#define MISC_DEV_CMD_CREATE_SOFT_I2C    (0x1024 + 7)
-#define MISC_DEV_CMD_DELETE_SOFT_I2C    (0x1024 + 8)
-#define MISC_DEV_CMD_GET_FS_STAT        (0x1024 + 9)
+#define MISC_DEV_CMD_GET_MEMORY_SIZE    (0x1024 + 2)
+#define MISC_DEV_CMD_CPU_USAGE          (0x1024 + 3)
+#define MISC_DEV_CMD_CREATE_SOFT_I2C    (0x1024 + 4)
+#define MISC_DEV_CMD_DELETE_SOFT_I2C    (0x1024 + 5)
+#define MISC_DEV_CMD_GET_FS_STAT        (0x1024 + 6)
+#define MISC_DEV_CMD_NTP_SYNC           (0x1024 + 7)
+#define MISC_DEV_CMD_GET_UTC_TIMESTAMP  (0x1024 + 8)
+#define MISC_DEV_CMD_SET_UTC_TIMESTAMP  (0x1024 + 9)
+#define MISC_DEV_CMD_GET_LOCAL_TIME     (0x1024 + 10)
+#define MISC_DEV_CMD_SET_TIMEZONE       (0x1024 + 11)
+#define MISC_DEV_CMD_GET_TIMEZONE       (0x1024 + 12)
 
 struct meminfo_t {
   size_t total_size;
@@ -252,6 +256,8 @@ static int misc_ntp_sync(void *args) {
   if(0x00 < ntp_sync_to_rtc(RT_NULL)) {
     result = 1;
   }
+#else
+  return -1;
 #endif
 
   if (sizeof(int) != lwp_put_to_user(args, &result, sizeof(int))) {
@@ -262,38 +268,27 @@ static int misc_ntp_sync(void *args) {
   return 0;
 }
 
-static int misc_get_time_t(void *args) {
-  time_t t;
+static int misc_get_utc_timestamp(void *args) {
+  time_t tm = time(NULL);
 
-  time(&t);
-
-  if (sizeof(time_t) != lwp_put_to_user(args, &t, sizeof(time_t))) {
+  if (sizeof(tm) != lwp_put_to_user(args, &tm, sizeof(tm))) {
     rt_kprintf("%s put_to_user failed\n", __func__);
+    return -2;
+  }
+
+  return  0;
+}
+
+static int misc_set_utc_timestamp(void *args) {
+  time_t tm;
+
+  if(sizeof(tm) != lwp_get_from_user(&tm, args, sizeof(tm))) {
+    rt_kprintf("%s get_frome_user failed\n", __func__);
     return -1;
   }
 
-  return 0;
-}
-
-static volatile uint64_t time_elapsed = 0;
-
-static inline __attribute__((always_inline)) uint64_t get_ticks()
-{
-    __asm__ __volatile__(
-        "rdtime %0"
-        : "=r"(time_elapsed));
-    return time_elapsed;
-}
-
-static int misc_get_cpu_tick(void *args) {
-  uint64_t tick = get_ticks();
-
-  if (sizeof(uint64_t) != lwp_put_to_user(args, &tick, sizeof(uint64_t))) {
-    rt_kprintf("%s put_to_user failed\n", __func__);
-    return -1;
-  }
-
-  return 0;
+  extern int stime(const time_t *t);
+  return stime(&tm);
 }
 
 static int misc_get_memory_size(void *args) {
@@ -382,6 +377,47 @@ static int misc_get_fs_stat(void *args) {
   return ret;
 }
 
+static int misc_get_local_time(void *args) {
+  time_t tv;
+  struct tm *_tm = NULL;
+
+  tv = time(NULL);
+  _tm = localtime(&tv);
+
+  if(sizeof(*_tm) != lwp_put_to_user(args, _tm, sizeof(*_tm))) {
+    rt_kprintf("%s put_to_user failed\n", __func__);
+    return -1;
+  }
+
+  return 0;
+}
+
+static int misc_set_timezone(void *args) {
+  time_t offset;
+
+  if(sizeof(offset) != lwp_get_from_user(&offset, args, sizeof(offset))) {
+    rt_kprintf("%s get_frome_user failed\n", __func__);
+    return -1;
+  }
+
+  extern void rt_tz_set(int32_t offset_sec);
+  rt_tz_set(offset);
+
+  return 0;
+}
+
+static int misc_get_timezone(void *args) {
+  extern int32_t rt_tz_get(void);
+  time_t offset = rt_tz_get();
+
+  if(sizeof(offset) != lwp_put_to_user(args, &offset, sizeof(offset))) {
+    rt_kprintf("%s put_to_user failed\n", __func__);
+    return -1;
+  }
+
+  return 0;
+}
+
 static const struct misc_dev_handle misc_handles[] = {
   {
     .cmd = MISC_DEV_CMD_READ_HEAP,
@@ -400,12 +436,12 @@ static const struct misc_dev_handle misc_handles[] = {
     .func = misc_ntp_sync,
   },
   {
-    .cmd = MISC_DEV_CMD_GET_TIME_T,
-    .func = misc_get_time_t,
+    .cmd = MISC_DEV_CMD_GET_UTC_TIMESTAMP,
+    .func = misc_get_utc_timestamp,
   },
   {
-    .cmd = MISC_DEV_CMD_GET_CPU_TICK,
-    .func = misc_get_cpu_tick,
+    .cmd = MISC_DEV_CMD_SET_UTC_TIMESTAMP,
+    .func = misc_set_utc_timestamp,
   },
   {
     .cmd = MISC_DEV_CMD_GET_MEMORY_SIZE,
@@ -422,7 +458,19 @@ static const struct misc_dev_handle misc_handles[] = {
   {
     .cmd = MISC_DEV_CMD_GET_FS_STAT,
     .func = misc_get_fs_stat,
-  }
+  },
+  {
+    .cmd = MISC_DEV_CMD_GET_LOCAL_TIME,
+    .func = misc_get_local_time,
+  },
+  {
+    .cmd = MISC_DEV_CMD_SET_TIMEZONE,
+    .func = misc_set_timezone,
+  },
+  {
+    .cmd = MISC_DEV_CMD_GET_TIMEZONE,
+    .func = misc_get_timezone,
+  },
 };
 
 static int misc_ioctl(struct dfs_fd *file, int cmd, void *args) {
