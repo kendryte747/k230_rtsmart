@@ -71,6 +71,10 @@ menu "Drivers Configuration"
                     bool "Enable Soft I2C"
                     default n
 
+                config RT_USING_I2C_SLAVE_EEPROM
+                    bool "Enable I2C Slave Server as eeprom"
+                    default n
+
                 config RT_USING_I2C0
                     bool "Enable I2C0"
                     default n
