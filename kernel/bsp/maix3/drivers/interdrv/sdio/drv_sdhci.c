@@ -856,11 +856,11 @@ rt_int32_t kd_sdhci_init(void)
     mmcsd_host0->ops = &ops;
     mmcsd_host0->freq_min = 400000;
     mmcsd_host0->freq_max = 50000000;
+
+    strncpy(mmcsd_host0->name, "sd0", sizeof(mmcsd_host0->name) - 1);
 #ifdef RT_SDIO0_EMMC
-    strncpy(mmcsd_host0->name, "emmc", sizeof(mmcsd_host0->name) - 1);
     mmcsd_host0->flags = MMCSD_BUSWIDTH_8 | MMCSD_MUTBLKWRITE | MMCSD_SUP_HIGHSPEED | MMCSD_SUP_SDIO_IRQ;
 #else
-    strncpy(mmcsd_host0->name, "sd0", sizeof(mmcsd_host0->name) - 1);
     mmcsd_host0->flags = MMCSD_BUSWIDTH_4 | MMCSD_MUTBLKWRITE | MMCSD_SUP_HIGHSPEED | MMCSD_SUP_SDIO_IRQ;
 #endif
     mmcsd_host0->valid_ocr = sdhci_host0->io_fixed_1v8 ? VDD_165_195 : VDD_32_33 | VDD_33_34;
