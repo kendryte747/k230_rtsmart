@@ -113,11 +113,11 @@ menu "Components Configuration"
                 endif
 
             config ENABLE_CANMV_USB_HOST
-                bool "Enable USB Host for CanMV"
+                bool "Enable USB Host for CanMV(Some USB Host Drivers)"
                 default n
                 select CHERRY_USB_HOST_ENABLE_CLASS_NET_RTL8152
                 help
-                    CanMV USB Host Select class net/rtl8152
+                    CanMV USB Host support for class net/rtl8152 and etc.
 
             if ENABLE_CANMV_USB_HOST
                 config CANMV_USB_PWR_PIN

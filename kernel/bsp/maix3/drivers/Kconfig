@@ -82,6 +82,7 @@ menu "Drivers Configuration"
                     if RT_USING_I2C0
                         config RT_USING_I2C0_SLAVE
                         bool "Enable I2C0 SLAVE mode"
+                        select RT_USING_I2C_SLAVE_EEPROM
                         default n
                     endif
                 config RT_USING_I2C1
@@ -91,6 +92,7 @@ menu "Drivers Configuration"
                     if RT_USING_I2C1
                         config RT_USING_I2C1_SLAVE
                         bool "Enable I2C1 SLAVE mode"
+                        select RT_USING_I2C_SLAVE_EEPROM
                         default n
                     endif
                 config RT_USING_I2C2
@@ -100,6 +102,7 @@ menu "Drivers Configuration"
                     if RT_USING_I2C2
                         config RT_USING_I2C2_SLAVE
                         bool "Enable I2C2 SLAVE mode"
+                        select RT_USING_I2C_SLAVE_EEPROM
                         default n
                     endif
                 config RT_USING_I2C3
@@ -109,6 +112,7 @@ menu "Drivers Configuration"
                     if RT_USING_I2C3
                         config RT_USING_I2C3_SLAVE
                         bool "Enable I2C3 SLAVE mode"
+                        select RT_USING_I2C_SLAVE_EEPROM
                         default n
                     endif
                 config RT_USING_I2C4
@@ -118,6 +122,7 @@ menu "Drivers Configuration"
                     if RT_USING_I2C4
                         config RT_USING_I2C4_SLAVE
                         bool "Enable I2C4 SLAVE mode"
+                        select RT_USING_I2C_SLAVE_EEPROM
                         default n
                     endif
             endif

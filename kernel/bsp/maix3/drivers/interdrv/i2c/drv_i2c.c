@@ -252,110 +252,112 @@ void xxd(int argc, char* argv[]) {
 }
 MSH_CMD_EXPORT(xxd, make a hexdump or do the reverse.)
 
+#if (defined (RT_USING_I2C0_SLAVE) || defined (RT_USING_I2C1_SLAVE) || \
+    defined (RT_USING_I2C2_SLAVE) || defined (RT_USING_I2C3_SLAVE) || \
+    defined (RT_USING_I2C4_SLAVE))
+#ifndef (RT_USING_I2C_SLAVE_EEPROM)
+    #error RT_USING_I2C_SLAVE_EEPROM is required
+#endif
+#endif
+
 static struct chip_i2c_bus i2c_buses[] =
 {
 #ifdef RT_USING_I2C0
     {
-        .device_name = "i2c0",
         .i2c = {
             .regs = (struct i2c_regs *)0x91405000U,
+            .scl_sda_cfg = {0},
         },
-        .i2c.scl_sda_cfg = {0},
-        #ifdef RT_USING_I2C0_SLAVE
-        #ifndef RT_USING_I2C_SLAVE_EEPROM
-        #error RT_USING_I2C_SLAVE_EEPROM is required
-        #endif
+#ifdef RT_USING_I2C0_SLAVE
+        .device_name = "i2c0_slave",
         .slave = RT_TRUE,
         .slave_address = 0x20,
         .slave_callback = i2c_slave_eeprom_callback,
         .slave_callback_ctx = &eeprom,
-        #else
+#else
+        .device_name = "i2c0",
         .slave = RT_FALSE,
-        #endif
+#endif
         .irq = 21,
     },
 #endif
+
 #ifdef RT_USING_I2C1
     {
-        .device_name = "i2c1",
         .i2c = {
             .regs = (struct i2c_regs *)0x91406000U,
+            .scl_sda_cfg = {0},
         },
-        .i2c.scl_sda_cfg = {0},
-        #ifdef RT_USING_I2C1_SLAVE
-        #ifndef RT_USING_I2C_SLAVE_EEPROM
-        #error RT_USING_I2C_SLAVE_EEPROM is required
-        #endif
+#ifdef RT_USING_I2C1_SLAVE
+        .device_name = "i2c1_slave",
         .slave = RT_TRUE,
         .slave_address = 0x21,
         .slave_callback = i2c_slave_eeprom_callback,
         .slave_callback_ctx = &eeprom,
-        #else
+#else
+        .device_name = "i2c1",
         .slave = RT_FALSE,
-        #endif
+#endif
         .irq = 22,
     },
 #endif
+
 #ifdef RT_USING_I2C2
     {
-        .device_name = "i2c2",
         .i2c = {
             .regs = (struct i2c_regs *)0x91407000U,
+            .scl_sda_cfg = {0},
         },
-        .i2c.scl_sda_cfg = {0},
-        #ifdef RT_USING_I2C2_SLAVE
-        #ifndef RT_USING_I2C_SLAVE_EEPROM
-        #error RT_USING_I2C_SLAVE_EEPROM is required
-        #endif
+#ifdef RT_USING_I2C2_SLAVE
+        .device_name = "i2c2_slave",
         .slave = RT_TRUE,
         .slave_address = 0x22,
         .slave_callback = i2c_slave_eeprom_callback,
         .slave_callback_ctx = &eeprom,
-        #else
+#else
+        .device_name = "i2c2",
         .slave = RT_FALSE,
-        #endif
+#endif
         .irq = 23,
     },
 #endif
+
 #ifdef RT_USING_I2C3
     {
-        .device_name = "i2c3",
         .i2c = {
             .regs = (struct i2c_regs *)0x91408000U,
+            .scl_sda_cfg = {0},
         },
-        .i2c.scl_sda_cfg = {0},
-        #ifdef RT_USING_I2C3_SLAVE
-        #ifndef RT_USING_I2C_SLAVE_EEPROM
-        #error RT_USING_I2C_SLAVE_EEPROM is required
-        #endif
+#ifdef RT_USING_I2C3_SLAVE
+        .device_name = "i2c3_slave",
         .slave = RT_TRUE,
         .slave_address = 0x23,
         .slave_callback = i2c_slave_eeprom_callback,
         .slave_callback_ctx = &eeprom,
-        #else
+#else
+        .device_name = "i2c3",
         .slave = RT_FALSE,
-        #endif
+#endif
         .irq = 24,
     },
 #endif
+
 #ifdef RT_USING_I2C4
     {
-        .device_name = "i2c4",
         .i2c = {
             .regs = (struct i2c_regs *)0x91409000U,
+            .scl_sda_cfg = {0},
         },
-        .i2c.scl_sda_cfg = {0},
-        #ifdef RT_USING_I2C4_SLAVE
-        #ifndef RT_USING_I2C_SLAVE_EEPROM
-        #error RT_USING_I2C_SLAVE_EEPROM is required
-        #endif
+#ifdef RT_USING_I2C4_SLAVE
+        .device_name = "i2c4_slave",
         .slave = RT_TRUE,
         .slave_address = 0x24,
         .slave_callback = i2c_slave_eeprom_callback,
         .slave_callback_ctx = &eeprom,
-        #else
+#else
+        .device_name = "i2c4",
         .slave = RT_FALSE,
-        #endif
+#endif
         .irq = 25,
     },
 #endif
@@ -985,12 +987,8 @@ int rt_hw_i2c_init(void)
         } else {
             dw_i2c_init((struct i2c_regs *)i2c_buses[i].i2c.regs);
             designware_i2c_set_bus_speed(&i2c_buses[i], I2C_FAST_SPEED);
-
-            /* pinctrl configuration */
-            /* wait for next version */
-            /* register i2c device */
-            rt_i2c_bus_device_register(&i2c_buses[i].parent, i2c_buses[i].device_name);
         }
+        rt_i2c_bus_device_register(&i2c_buses[i].parent, i2c_buses[i].device_name);
     }
 
     return 0;
