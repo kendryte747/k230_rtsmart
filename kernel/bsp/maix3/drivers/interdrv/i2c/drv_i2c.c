@@ -255,7 +255,7 @@ MSH_CMD_EXPORT(xxd, make a hexdump or do the reverse.)
 #if (defined (RT_USING_I2C0_SLAVE) || defined (RT_USING_I2C1_SLAVE) || \
     defined (RT_USING_I2C2_SLAVE) || defined (RT_USING_I2C3_SLAVE) || \
     defined (RT_USING_I2C4_SLAVE))
-#ifndef (RT_USING_I2C_SLAVE_EEPROM)
+#ifndef RT_USING_I2C_SLAVE_EEPROM
     #error RT_USING_I2C_SLAVE_EEPROM is required
 #endif
 #endif
