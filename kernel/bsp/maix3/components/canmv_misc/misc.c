@@ -11,6 +11,7 @@
 #include <lwp_user_mm.h>
 
 #include "board.h"
+#include "ioremap.h"
 
 #ifdef RT_USING_LWP
 #include <lwp.h>
@@ -139,6 +140,7 @@ static int misc_close(struct dfs_fd *file) { return 0; }
 #define MISC_DEV_CMD_GET_LOCAL_TIME     (0x1024 + 10)
 #define MISC_DEV_CMD_SET_TIMEZONE       (0x1024 + 11)
 #define MISC_DEV_CMD_GET_TIMEZONE       (0x1024 + 12)
+#define MISC_DEV_CMD_SET_AUTO_EXEC_PY_STAGE (0x1024 + 13)
 
 struct meminfo_t {
   size_t total_size;
@@ -418,6 +420,120 @@ static int misc_get_timezone(void *args) {
   return 0;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Solve the problem that micropython                                        //
+// automatically executes boot.py/main.py and causes system crash            //
+///////////////////////////////////////////////////////////////////////////////
+#define MAP_SIZE    PAGE_SIZE
+#define MAP_MASK    (MAP_SIZE - 1)
+
+#define MARK_ADDRESS  (0x80300000 + 1020 * 1024)
+
+enum {
+  STAGE_NORMAL = 1, 
+  STAGE_BOOTPY_START, 
+  STAGE_BOOTPY_END, 
+  STAGE_MAINPY_START, 
+  STAGE_MAINPY_END,
+  STAGE_MAX,
+};
+
+struct delete_file_mark {
+  uint32_t magic;
+  uint32_t path_stage;
+  uint32_t path_length;
+  uint32_t path_crc32;
+  char path[64];
+};
+
+static int mpy_auto_exec_py_stage = 0;
+
+extern uint32_t gpt_crc32(const void *data, size_t len);
+
+void canmv_on_micropython_error(void) {
+  char file_path[32];
+  struct delete_file_mark mark;
+
+  const rt_ubase_t target = MARK_ADDRESS;
+  void *map_base = rt_ioremap_nocache((void *)(target & ~MAP_MASK), MAP_SIZE);
+  volatile void *memory_address = map_base + (target & MAP_MASK);
+
+  if ((STAGE_BOOTPY_START == mpy_auto_exec_py_stage) || (STAGE_MAINPY_START == mpy_auto_exec_py_stage)) {
+    rt_snprintf(file_path, sizeof(file_path), "/sdcard/%s", 
+                (STAGE_BOOTPY_START == mpy_auto_exec_py_stage) ? "boot.py" : "main.py");
+
+    mark.magic = 0xDEADBEEF;
+    mark.path_stage = mpy_auto_exec_py_stage;
+    mark.path_length = strlen(file_path);
+    mark.path_crc32 = gpt_crc32(file_path, mark.path_length);
+    strncpy(mark.path, file_path, sizeof(mark.path));
+
+    memcpy(memory_address, &mark, sizeof(mark));
+
+    rt_iounmap(map_base);
+    rt_hw_cpu_reset();
+  }
+}
+
+int check_delete_file_mark(void) {
+  char new_path[64];
+  struct delete_file_mark mark;
+  
+  const rt_ubase_t target = MARK_ADDRESS;
+  void *map_base = rt_ioremap_nocache((void *)(target & ~MAP_MASK), MAP_SIZE);
+  volatile void *memory_address = map_base + (target & MAP_MASK);
+
+  memcpy(&mark, memory_address, sizeof(mark));
+  rt_iounmap(map_base);
+
+  if (mark.magic != 0xDEADBEEF) {
+    rt_kprintf("Invalid magic number: 0x%08X\n", mark.magic);
+    return -1;
+  }
+
+  if (mark.path_length >= sizeof(mark.path)) {
+    rt_kprintf("Invalid path length: %u\n", mark.path_length);
+    return -2;
+  }
+
+  uint32_t calculated_crc32 = gpt_crc32(mark.path, mark.path_length);
+  if (mark.path_crc32 != calculated_crc32) {
+    rt_kprintf("CRC32 mismatch: expected 0x%08X, got 0x%08X\n", calculated_crc32, mark.path_crc32);
+    return -3;
+  }
+
+  if(STAGE_BOOTPY_START == mark.path_stage) {
+    rt_strncpy(new_path, "/sdcard/bad_boot.py", sizeof("/sdcard/bad_boot.py") - 1);
+  } else if(STAGE_MAINPY_START == mark.path_stage) {
+    rt_strncpy(new_path, "/sdcard/bad_main.py", sizeof("/sdcard/bad_main.py") - 1);
+  } else {
+    rt_kprintf("Invalid mark stage %d\n", mark.path_stage);
+    return -4;
+  }
+
+  rt_kprintf("Valid delete file mark found\n");
+  // rt_kprintf("  Path: %s\n", mark.path);
+  // rt_kprintf("  Path Length: %u\n", mark.path_length);
+  // rt_kprintf("  CRC32: 0x%08X\n", mark.path_crc32);
+
+  dfs_file_rename(mark.path, new_path);
+
+  return 0;
+}
+
+static int misc_set_auto_exec_stage(void *args) {
+  int stage;
+
+  if(sizeof(stage) != lwp_get_from_user(&stage, args, sizeof(stage))) {
+    rt_kprintf("%s get_frome_user failed\n", __func__);
+    return -1;
+  }
+
+  mpy_auto_exec_py_stage = stage;
+
+  return 0;
+}
+
 static const struct misc_dev_handle misc_handles[] = {
   {
     .cmd = MISC_DEV_CMD_READ_HEAP,
@@ -470,6 +586,10 @@ static const struct misc_dev_handle misc_handles[] = {
   {
     .cmd = MISC_DEV_CMD_GET_TIMEZONE,
     .func = misc_get_timezone,
+  },
+  {
+    .cmd = MISC_DEV_CMD_SET_AUTO_EXEC_PY_STAGE,
+    .func = misc_set_auto_exec_stage,
   },
 };
 

@@ -174,6 +174,9 @@ int main(void) {
   excute_sdcard_config();
 #endif //RT_USING_SDIO
 
+  extern int check_delete_file_mark(void);
+  check_delete_file_mark();
+
 #ifdef ENABLE_CHERRY_USB
   void *usb_base;
   const void *usb_dev_addr[2] = {(void *)0x91500000UL, (void *)0x91540000UL};

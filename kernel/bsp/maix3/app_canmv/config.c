@@ -171,15 +171,6 @@ _exit:
 // GPT ////////////////////////////////////////////////////////////////////////
 # define ENABLE_GPT_PART_RESIZE   0
 
-#if defined (ENABLE_GPT_PART_RESIZE) && ENABLE_GPT_PART_RESIZE
-
-#include <drivers/gpt.h>
-
-#define GPT_ENTRIES 		128
-#define GPT_SECTORS		(1 + GPT_ENTRIES * sizeof(gpt_entry) / 512)
-
-_Static_assert(sizeof(gpt_entry) == 128, "gpt_entry size error.");
-
 uint32_t gpt_crc32_next(const void *data, size_t len, uint32_t last_crc)
 {
     uint32_t crc = ~last_crc;
@@ -204,6 +195,15 @@ uint32_t gpt_crc32(const void *data, size_t len)
 {
 	return gpt_crc32_next(data, len, 0);
 }
+
+#if defined (ENABLE_GPT_PART_RESIZE) && ENABLE_GPT_PART_RESIZE
+
+#include <drivers/gpt.h>
+
+#define GPT_ENTRIES 		128
+#define GPT_SECTORS		(1 + GPT_ENTRIES * sizeof(gpt_entry) / 512)
+
+_Static_assert(sizeof(gpt_entry) == 128, "gpt_entry size error.");
 
 static int mmc_gpt_part_create_new(struct mmcsd_blk_device *blk_dev,
                                    rt_device_t dev_sd) {

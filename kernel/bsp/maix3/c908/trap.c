@@ -238,6 +238,14 @@ void handle_user(rt_size_t scause, rt_size_t stval, rt_size_t sepc, struct rt_hw
     rt_hw_backtrace((uint32_t *)sp->s0_fp, sepc);
 
     LOG_E("User Fault, killing thread: %s", rt_thread_self()->name);
+
+#if 1
+    if(0x00 == rt_strncmp("micropython", rt_thread_self()->name, sizeof("micropython") - 1)) {
+        extern void canmv_on_micropython_error(void);
+        canmv_on_micropython_error();
+    }
+#endif
+
     sys_exit(-1);
 }
 
