@@ -174,8 +174,10 @@ int main(void) {
   excute_sdcard_config();
 #endif //RT_USING_SDIO
 
+#if defined (RT_RECOVERY_MPY_AUTO_EXEC_PY)
   extern int check_delete_file_mark(void);
   check_delete_file_mark();
+#endif
 
 #ifdef ENABLE_CHERRY_USB
   void *usb_base;

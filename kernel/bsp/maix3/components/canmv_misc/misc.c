@@ -420,6 +420,7 @@ static int misc_get_timezone(void *args) {
   return 0;
 }
 
+#if defined (RT_RECOVERY_MPY_AUTO_EXEC_PY)
 ///////////////////////////////////////////////////////////////////////////////
 // Solve the problem that micropython                                        //
 // automatically executes boot.py/main.py and causes system crash            //
@@ -520,6 +521,7 @@ int check_delete_file_mark(void) {
 
   return 0;
 }
+#endif
 
 static int misc_set_auto_exec_stage(void *args) {
   int stage;

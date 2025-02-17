@@ -393,6 +393,7 @@ CONFIG_USER_APP_DIR="app_canmv"
 #
 # Applications CanMV Configuration
 #
+CONFIG_RT_RECOVERY_MPY_AUTO_EXEC_PY=y
 
 #
 # K230 Custom Configure Start
