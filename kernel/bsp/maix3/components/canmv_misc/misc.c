@@ -488,7 +488,7 @@ int check_delete_file_mark(void) {
   rt_iounmap(map_base);
 
   if (mark.magic != 0xDEADBEEF) {
-    rt_kprintf("Invalid magic number: 0x%08X\n", mark.magic);
+    // rt_kprintf("Invalid magic number: 0x%08X\n", mark.magic);
     return -1;
   }
 

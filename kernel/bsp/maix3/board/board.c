@@ -346,3 +346,16 @@ void rt_hw_cpu_reset(void)
     while(1);
 }
 MSH_CMD_EXPORT_ALIAS(rt_hw_cpu_reset, reboot, reset machine);
+
+void reboot_to_upgrade(void)
+{
+    const rt_ubase_t target = 0x80230000;
+    void *map_base = rt_ioremap_nocache((void *)(target & ~(PAGE_SIZE - 1)), PAGE_SIZE);
+    volatile rt_uint32_t *memory_address = (rt_uint32_t *)(void *)(map_base + (target & (PAGE_SIZE - 1)));
+
+    *memory_address = 0x5aa5a55a;
+
+    rt_iounmap(map_base);
+    rt_hw_cpu_reset();
+}
+MSH_CMD_EXPORT_ALIAS(reboot_to_upgrade, reboot_to_upgrade, reboot to upgrade mode);
