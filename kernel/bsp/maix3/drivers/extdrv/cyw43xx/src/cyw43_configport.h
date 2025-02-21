@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "rtconfig.h"
+
 #define CYW43_CHIPSET_FIRMWARE_INCLUDE_FILE "firmware/fw_bcm43438a1.h"
 #define CYW43_WIFI_NVRAM_INCLUDE_FILE       "firmware/nvram.h"
 #define CYW43_CLEAR_SDIO_INT                (1)
@@ -11,7 +13,7 @@
 #define CYW43_NETUTILS                      (0)
 #define CYW43_USE_OTP_MAC                   (1)
 
-#define CYW43_PIN_WL_REG_ON                 (1)
+// #define CYW43_PIN_WL_REG_ON                 (1)
 #define CYW43_PIN_WL_SDIO_1                 (1)
 #define NDEBUG
 

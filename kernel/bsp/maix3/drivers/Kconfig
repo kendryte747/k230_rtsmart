@@ -261,6 +261,10 @@ menu "Drivers Configuration"
                     default 0 if CYW43XX_SDIO_DEV0
                     default 1 if CYW43XX_SDIO_DEV1
 
+                config CYW43_PIN_WL_REG_ON
+                    int "CYW43XX REG_ON Pin"
+                    default 1
+
                 config CYW43XX_THREAD_PRIORITY
                     int
                     default 10
